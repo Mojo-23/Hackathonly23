@@ -5,82 +5,66 @@ Copy this shape into `/tasks/current-task.md` for every new task. Fill every sec
 ---
 
 ## Task ID
-`PHASE3E-001`
+`PHASE3E-002`
 
 ## Phase reference
-`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task adds database tests proving the already-approved identity foundation (`PHASE3B-001`, `PHASE3C-001`, `PHASE3D-001`) behaves as designed. It does not add or change any migration or product feature.
+`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task closes the test-coverage advisory raised in the `PHASE3E-001` review. It adds tests only; no schema, RLS, or trigger behavior changes.
 
 ## Objective
-Add committed pgTAP-style database tests under `supabase/tests/` that verify, against a **local** Supabase instance only, that `profiles`, `user_contacts`, their RLS policies, and the signup trigger behave exactly as the three approved identity migrations intend.
+Extend the local pgTAP test suite so all four branches of the signup trigger's `full_name` fallback chain (from D17 / `20260710140000_signup_profile_trigger.sql`) are exercised by a real synthetic `auth.users` insert, not just the first branch.
 
 ## Context
-- `PHASE3B-001` (approved): `20260710120000_identity_foundation.sql` — `profiles` (identity/display) and `user_contacts` (private contact data), separated.
-- `PHASE3C-001` (approved): `20260710130000_identity_rls.sql` — self-owned RLS on both tables.
-- `PHASE3D-001` (approved): `20260710140000_signup_profile_trigger.sql` — `auth.users` signup trigger creates a minimal `profiles` row (id + `full_name` fallback chain), never touches `user_contacts`, never copies contact data.
-- The human has already initialized local Supabase and run `npx supabase db reset` successfully, applying all three migrations above to the **local** instance. `npx supabase test db --help` confirms the local CLI's pgTAP test runner is available.
-- This is the first task in the project authorized to run a local database operation. That authorization is narrow and explicit — see "Local vs. remote — read carefully" below.
-
-## Local vs. remote — read carefully
-This task authorizes exactly two commands, **against the local Supabase instance only**:
-- `npx supabase db reset` (to get a clean local database matching the three approved migrations, so tests run against a known state)
-- `npx supabase test db --local supabase/tests` (to run the tests you write)
-
-Nothing else. No remote project connection, no `npx supabase db push`, no `npx supabase link`, no Supabase Studio/SQL Editor, no use of any `SUPABASE_SERVICE_ROLE_KEY`/URL pointing at a hosted project. If at any point running these commands seems to require or trigger a remote connection, stop and report it in the handoff rather than proceeding.
+- `PHASE3E-001` (approved): added `supabase/tests/database/identity_foundation.test.sql`, including a behavioral test of the signup trigger that supplies `raw_user_meta_data->>'full_name'` and confirms it lands in `profiles.full_name`.
+- The `PHASE3E-001` review approved the task but flagged, as an explicit advisory (not a blocker): only the primary fallback branch (`full_name`) is exercised. The `name`, `display_name`, and final placeholder (`'New participant'`) branches from the trigger's `coalesce(...)` chain are not yet covered by any test.
+- The trigger itself (`supabase/migrations/20260710140000_signup_profile_trigger.sql`) is already approved and frozen — this task tests it, it does not change it.
 
 ## In scope
-- Create one or more pgTAP-style SQL test files under `supabase/tests/` (e.g. `supabase/tests/database/identity_foundation.test.sql`, or split into a few focused files — your judgment, explain the structure in the handoff), compatible with `npx supabase test db --local supabase/tests`.
-- Tests should cover, at minimum:
-  1. `profiles` table exists (in `public` schema).
-  2. `user_contacts` table exists (in `public` schema).
-  3. `profiles` does **not** have `email`, `phone`, or `whatsapp` columns (or any other contact-shaped column).
-  4. `user_contacts` **does** have `email`, `phone`, and `whatsapp` columns.
-  5. Row Level Security is enabled on `profiles`.
-  6. Row Level Security is enabled on `user_contacts`.
-  7. The signup trigger function (`public.create_profile_for_new_user`, or whatever it is actually named in `20260710140000_signup_profile_trigger.sql` — read the file, don't assume) exists.
-  8. The `auth.users` trigger itself exists and is wired to that function.
-  9. Behaviorally: inserting a synthetic row into `auth.users` (see "Testing expectations" below) results in exactly one new `profiles` row with `id` matching the inserted user and a non-null `full_name`.
-  10. Behaviorally: that same insert does **not** create any row in `user_contacts`.
-  11. Behaviorally: no email/phone/whatsapp value from the synthetic `auth.users` row appears anywhere in the resulting `profiles` row.
-- Add a concise comment above each test (or test group) explaining what it verifies and why it matters (e.g. "contact data must never leak into profiles — see PRIVACY_MODEL.md").
-- Where practical, include a check that no database object name created by the identity migrations contains the forbidden identifier (the string formed by `profile` + `_` + `id`) — e.g. by inspecting `information_schema`/`pg_catalog` object names relevant to these tables/functions/triggers. If this is impractical to express cleanly in pgTAP, say so in the handoff instead of forcing it.
-- Run `npx supabase db reset` locally to get a clean baseline, then run `npx supabase test db --local supabase/tests` and iterate until it passes.
+- Add pgTAP test coverage for the three remaining `full_name` fallback branches, each via its own synthetic `auth.users` insert with a distinct synthetic UUID:
+  1. `raw_user_meta_data` containing `name` but not `full_name` → `profiles.full_name` should equal that `name` value.
+  2. `raw_user_meta_data` containing `display_name` but neither `full_name` nor `name` → `profiles.full_name` should equal that `display_name` value.
+  3. `raw_user_meta_data` containing none of `full_name`/`name`/`display_name` (e.g. an empty object, or a key unrelated to any of the three) → `profiles.full_name` should equal the literal placeholder `'New participant'`.
+- You may either extend the existing `supabase/tests/database/identity_foundation.test.sql` file with these additional cases, or add a new focused file (e.g. `supabase/tests/database/signup_trigger_fallback.test.sql`) — your judgment; explain the choice in the handoff. If you extend the existing file, update its `select plan(N)` count to match the new total test count exactly (the `PHASE3E-001` handoff noted this exact mistake had to be caught and fixed once already — get the count right the first time).
+- Each new synthetic `auth.users` row must use its own distinct fixed UUID (do not reuse `11111111-1111-4111-8111-111111111111` from `PHASE3E-001` — pick clearly distinct, obviously-synthetic UUIDs for each of the three new cases) and obviously-fake email/metadata values, consistent with the conventions already established in `PHASE3E-001` (e.g. `.invalid`-TLD emails).
+- Reuse the same cleanup pattern already established in `PHASE3E-001` (pre-test guard delete for the specific synthetic ids, then the actual test body inside `begin; ... rollback;`) so these tests are safe to run repeatedly and leave no residue.
+- Add a short comment above each new test explaining which fallback branch it exercises.
 
 ## Out of scope
-- Any new or modified migration file — the schema/RLS/trigger are already approved and frozen for this task; if a test reveals a real defect in them, stop and report it rather than editing `supabase/migrations/`.
-- Any remote Supabase connection, `db push`, `supabase link`, or SQL Editor use of any kind.
+- Any change to `supabase/migrations/` — the trigger's logic is already approved; if a new test reveals it doesn't actually behave as documented, stop and report that as a finding rather than editing the migration.
+- Any change to `/docs`.
+- Any RLS policy change.
 - Any auth UI, login/signup form, onboarding flow, or product UI change.
-- `organizations`, `hackathons`, matching/team tables, contact-reveal logic, or sponsor/talent access of any kind.
-- Any real user data — all `auth.users`/`profiles`/`user_contacts` rows used in tests must be obviously synthetic (test emails, placeholder names), never anything resembling a real person.
-- Any secret, real API key, or real Supabase project URL/credential committed anywhere.
-- Any edit to `/docs`, `AGENTS.md`, `CLAUDE.md`, `WORKFLOW.md`, or `scripts/*.ps1`.
-- Any file outside `supabase/tests/` plus the standard `handoff/CODEX_SUMMARY.md` write (and the two authorized local CLI runs, which don't produce committed files beyond your test files).
+- Any remote Supabase connection, `db push`, `supabase link`, or SQL Editor use of any kind — local only, same boundary as `PHASE3E-001`.
+- Any real user data, real secret, or real credential anywhere.
+- Any test unrelated to this specific fallback-chain coverage gap (do not expand scope into testing other parts of the identity foundation already covered by `PHASE3E-001`, and do not start testing anything outside the signup trigger).
+- Any file outside `supabase/tests/` plus the standard `handoff/CODEX_SUMMARY.md` write.
 
 ## Relevant docs
-- `docs/DATABASE.md` §1 (`profiles`, `user_contacts`) — column shapes and privacy levels the tests must verify against.
-- `docs/PRIVACY_MODEL.md` §1 — why contact-data separation is load-bearing, not incidental, for these tests.
-- `docs/RLS_ACCESS_MATRIX.md` — `profiles`/`user_contacts` rows, for what "RLS enabled, self-owned only" should mean in test form.
-- `docs/PRODUCT_DECISIONS.md` D17 — the signup trigger's intended behavior (fallback chain, no `user_contacts` creation) that the behavioral tests must confirm.
-- `supabase/migrations/20260710120000_identity_foundation.sql`, `20260710130000_identity_rls.sql`, `20260710140000_signup_profile_trigger.sql` — read these directly for exact table/column/function/trigger names; do not guess or assume names not confirmed by reading the files.
+- `docs/PRODUCT_DECISIONS.md` D17 — the exact fallback chain and order this task must test against.
+- `supabase/migrations/20260710140000_signup_profile_trigger.sql` — read directly for the exact `coalesce(...)` expression and column/function names; do not guess.
+- `supabase/tests/database/identity_foundation.test.sql` — the existing test file and its established synthetic-data/cleanup conventions to follow.
+- `handoff/CLAUDE_REVIEW.md` (the `PHASE3E-001` review) — the specific advisory this task resolves, in the reviewer's own words.
 
 ## Approvals on record
-- [x] Database migration approved by human — **not applicable; no new migration in this task.** The three existing migrations remain frozen and unmodified.
-- [x] Local-only database operations approved by human — **explicitly approved, narrowly.** The human has already run `npx supabase db reset` locally and confirmed `npx supabase test db --help` is available. This task is authorized to run `npx supabase db reset` and `npx supabase test db --local supabase/tests` against the **local** instance only. Remote connection, `db push`, `supabase link`, and SQL Editor use remain unapproved and forbidden.
-- [ ] RLS / contact-reveal logic approved by human — not applicable; no RLS policy is created or modified in this task, only tested.
+- [x] Database migration approved by human — **not applicable; no migration in this task.** The trigger remains frozen and unmodified.
+- [x] Local-only database operations approved by human — **explicitly approved, narrowly, same boundary as `PHASE3E-001`.** This task is authorized to run `npx supabase db reset` and `npx supabase test db --local supabase/tests` against the **local** instance only. Remote connection, `db push`, `supabase link`, and SQL Editor use remain unapproved and forbidden.
+- [ ] RLS / contact-reveal logic approved by human — not applicable; no RLS policy is created or modified in this task.
 
 ## Files expected to change
-- One or more new files under `supabase/tests/` (e.g. `supabase/tests/database/identity_foundation.test.sql`)
+- `supabase/tests/database/identity_foundation.test.sql` (extended) **or** one new file under `supabase/tests/database/` (e.g. `supabase/tests/database/signup_trigger_fallback.test.sql`) — pick one approach, not both, and say which in the handoff.
 - `handoff/CODEX_SUMMARY.md` (standard handoff write)
 
 If the diff touches anything else, that is a deviation to flag, not a silent addition.
 
 ## Acceptance criteria
-- [ ] Test file(s) exist under `supabase/tests/`, focused only on identity-foundation behavior (tables, RLS enablement, trigger existence and behavior) — nothing else.
+- [ ] A test exists proving the `name` fallback branch works when `full_name` is absent.
+- [ ] A test exists proving the `display_name` fallback branch works when both `full_name` and `name` are absent.
+- [ ] A test exists proving the `'New participant'` placeholder is used when none of the three metadata keys are present.
+- [ ] Each new test uses its own distinct synthetic UUID, not reused across cases and not the UUID already used in `PHASE3E-001`.
+- [ ] No real user data, secret, or credential appears anywhere in the diff.
+- [ ] No forbidden identifier (the string formed by `profile` + `_` + `id`) appears anywhere in the diff, including as a literal in any new SQL.
+- [ ] No migration, RLS policy, doc, or product/UI file appears anywhere in the diff.
 - [ ] `npx supabase db reset` passes (local).
-- [ ] `npx supabase test db --local supabase/tests` passes (local).
-- [ ] No migration file was created or modified.
-- [ ] No remote Supabase connection, `db push`, `supabase link`, or SQL Editor use occurred anywhere in this task.
-- [ ] No real user data or real secret/credential appears anywhere in the diff.
-- [ ] No forbidden identifier (the string formed by `profile` + `_` + `id`) appears anywhere in the diff.
+- [ ] `npx supabase test db --local supabase/tests` passes (local), with a correct `plan()` count.
 - [ ] `npm run build` passes.
 - [ ] `npx tsc --noEmit` passes.
 - [ ] `npx eslint .` passes.
@@ -97,9 +81,9 @@ If the diff touches anything else, that is a deviation to flag, not a silent add
 - Do not weaken, remove, or bypass any workflow guard in `scripts/verify.ps1` or `scripts/run-codex-task.ps1`, and do not touch those files at all in this task.
 
 ## Testing expectations
-- Tests must be safe to run repeatedly against a locally reset database — no dependence on state left over from a prior run.
-- Synthetic `auth.users` rows inserted for behavioral tests must use obviously fake data (e.g. `test-signup-001@example.invalid`-style addresses, clearly placeholder names) and should be cleaned up after the test (explicit `delete`/rollback) or scoped inside a transaction that's rolled back, whichever fits the pgTAP pattern you use — explain your choice in the handoff.
-- Tests must not depend on any remote Supabase state or network access — local only, as stated above.
+- Tests must be safe to run repeatedly against a locally reset database, same as `PHASE3E-001`.
+- Each new synthetic `auth.users` row must use obviously fake data and be cleaned up via the established rollback/guard-delete pattern.
+- Tests must not depend on any remote Supabase state or network access — local only.
 
 ## Verification steps
 1. `npx supabase db reset` (local)
@@ -110,9 +94,9 @@ If the diff touches anything else, that is a deviation to flag, not a silent add
 6. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
 
 ## Handoff notes expected
-- List every test added, one line each, stating what it verifies.
-- Confirm explicitly that all eleven behaviors listed under "In scope" are covered, or explain precisely which are not and why.
-- State explicitly how synthetic test data is cleaned up (rollback vs. explicit delete) and confirm no real data was used.
-- Confirm explicitly that only local Supabase commands were run, and quote the exact commands used.
-- If the forbidden-identifier object-name check (item under "In scope") was impractical to express, say so explicitly rather than silently omitting it.
-- Flag immediately, rather than working around, anything that seemed to require a migration change, an RLS change, or a remote connection to make a test pass.
+- State which approach was taken (extended existing file vs. new file) and why.
+- List each new test added, one line each, stating which fallback branch it covers.
+- Confirm the final `plan()` count matches the actual number of tests run, and state the before/after test counts.
+- Confirm explicitly that all three previously-uncovered branches (`name`, `display_name`, placeholder) are now covered, alongside the primary `full_name` branch already covered by `PHASE3E-001`.
+- Confirm explicitly that only local Supabase commands were run, and quote them.
+- Confirm no real data, secret, or credential was used.
