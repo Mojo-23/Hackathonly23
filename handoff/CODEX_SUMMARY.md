@@ -1,46 +1,71 @@
-# Codex Summary - PHASE3D-000
+# Codex Summary - PHASE3D-001
 
 ## What changed
 
-Documented the identity creation decision in D17 and reconciled the database and RLS docs with the current `PHASE3C-001` policy state.
+Drafted one new SQL migration:
 
-Decision recorded:
+- `supabase/migrations/20260710140000_signup_profile_trigger.sql`
 
-1. `profiles` rows should be created by a Phase 3 database trigger on `auth.users` insert.
-2. `user_contacts` rows should be created by client-side onboarding through the existing self-owned insert policy.
-3. `profiles.full_name` is seeded by the trigger from auth metadata (`full_name`, then `name`) or the neutral placeholder `New participant`; onboarding must collect the real display name before registration or matching.
-4. The current `profiles_insert_own` policy is scaffolding from `PHASE3C-001`; after the signup trigger is implemented and verified, a separately approved RLS migration should remove or tighten direct profile inserts.
-5. Recommended next task: `PHASE3D-001` should implement the `auth.users` signup trigger described in D17 and keep onboarding responsible for contact-row creation.
+The migration creates `public.create_profile_for_new_user()` and wires it to an `after insert` trigger on `auth.users`.
 
-The decision explicitly keeps private contact data in `user_contacts` only.
+The function inserts only `id` and `full_name` into `public.profiles`, leaving all other profile columns at their defaults or `null`.
+
+Implemented `full_name` fallback chain, in D17/task order:
+
+1. `new.raw_user_meta_data->>'full_name'`
+2. `new.raw_user_meta_data->>'name'`
+3. `new.raw_user_meta_data->>'display_name'`
+4. `'New participant'`
+
+No email, phone, whatsapp, or other contact-shaped field is read from `auth.users` or copied into `public.profiles`.
+
+`public.user_contacts` is untouched by the trigger. The SQL comments explicitly state that onboarding owns contact-row creation and that contact data must never be copied into `public.profiles`.
+
+## Security and idempotency
+
+Used `security definer` because the trigger runs from the `auth.users` insert path and must be able to create the self-owned `public.profiles` row despite the current authenticated-user RLS policy shape. The function pins its search path with:
+
+```sql
+set search_path = public, pg_temp
+```
+
+The insert uses:
+
+```sql
+on conflict (id) do nothing
+```
+
+This makes the trigger safe if it is invoked more than once for the same auth user id, without overwriting an existing profile row.
 
 ## Files touched
 
-- `docs/PRODUCT_DECISIONS.md` - added D17 with the hybrid identity creation strategy and next task.
-- `docs/DATABASE.md` - updated the `profiles` and `user_contacts` creation-path descriptions plus data flows #1-2.
-- `docs/RLS_ACCESS_MATRIX.md` - corrected the `profiles INSERT` row to reflect current self-owned scaffolding and the D17 trigger target; updated the `user_contacts` note to reflect existing self-owned policies.
-- `handoff/CODEX_SUMMARY.md` - replaced the prior handoff with this one.
-
-`docs/PRIVACY_MODEL.md` was checked and did not need an edit because it already states that private contact fields live only in `user_contacts`.
+- `supabase/migrations/20260710140000_signup_profile_trigger.sql`
+- `handoff/CODEX_SUMMARY.md`
 
 ## Verification
 
+Manual SQL sanity check:
+
+- Confirmed the migration creates one function and one `after insert on auth.users` trigger.
+- Confirmed the fallback chain matches the task exactly.
+- Confirmed no RLS policy is created, dropped, or modified.
+- Confirmed no Supabase CLI command or live database connection was attempted.
+
 Ran:
 
-- `npm run build` - passed.
-- `npx tsc --noEmit` - passed.
-- `npx eslint .` - passed.
-- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` - passed all steps, including the forbidden identifier scan.
+- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` - passed.
 
-Task-specific consistency check:
+The verification script passed all steps:
 
-- Re-read `docs/RLS_ACCESS_MATRIX.md`'s `profiles INSERT` row against `supabase/migrations/20260710130000_identity_rls.sql`.
-- Confirmed the doc now states that `PHASE3C-001` currently permits own inserts while D17 names the signup-trigger target and later RLS tightening.
+- `npm run build`
+- `npx tsc --noEmit`
+- `npx eslint .`
+- forbidden identifier scan
 
 ## Deviations
 
-None. No SQL, RLS policy, product code, UI, task, script, or dependency file was changed.
+None.
 
 ## Open questions
 
-None for this documentation task. The actual trigger and later RLS tightening still require separately scoped tasks and approvals.
+None. No RLS tightening was attempted; that remains deferred to a separately approved task.
