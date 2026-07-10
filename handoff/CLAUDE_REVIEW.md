@@ -1,69 +1,63 @@
-# Claude Review — PHASE3C-001
+# Claude Review — PHASE3D-000
 
 ## 1. Verdict
 
 **APPROVE**
 
-The migration is a clean, correctly-scoped, deny-by-default RLS draft covering exactly `profiles` and `user_contacts`, with every policy self-owned and nothing broader. One design choice (`profiles_insert_own`) is worth a deliberate human decision before the signup-trigger task lands, but it was explicitly invited by this task's own wording and reasoned about honestly in the handoff — not a defect.
+The decision is explicit, internally consistent across all three touched docs, correctly resolves the `PHASE3C-001`-flagged ambiguity, and names a concrete next task. Every acceptance criterion is independently verified true.
 
 ## 2. Scope containment
 
-**Held.** The new migration file was untracked, so I read it directly rather than relying on `git diff --stat` (per your instruction) — confirmed via `git status --short` (`?? supabase/migrations/20260710130000_identity_rls.sql`) and a direct read of its full contents. Diff is exactly that one file plus the standard `handoff/CODEX_SUMMARY.md` write. No `/docs` file touched (`git status --short docs/` returned nothing), no product UI, no other table, no organization/hackathon/matching schema, no auth UI, no contact-reveal function.
+**Held.** `git status --short` shows exactly `docs/DATABASE.md`, `docs/PRODUCT_DECISIONS.md`, `docs/RLS_ACCESS_MATRIX.md`, plus the standard `handoff/CODEX_SUMMARY.md` write. No SQL, no migration, no RLS change, no auth UI, no product UI, no organizations/hackathons/matching/reveal work anywhere in the diff.
 
-## 3. Exactly one new RLS migration
+## 3. Only allowed docs + handoff changed
 
-**Confirmed.** `find supabase/migrations -type f` lists exactly two files: `20260710120000_identity_foundation.sql` (from `PHASE3B-001`, unchanged) and the new `20260710130000_identity_rls.sql` from this task.
+**Confirmed.** All three edited files are named in the task's "In scope" list. `docs/PRIVACY_MODEL.md` — one of the three *optional* files — was correctly left untouched; I independently checked it for any signup/creation-path claims that might now be stale and found none, so Codex's "checked, no edit needed" claim holds up rather than being a skipped check.
 
-## 4. RLS enabled on both tables
+## 4. Trigger vs. client insert vs. hybrid — clearly decided
 
-**Confirmed by direct read.** Lines 1–2: `alter table public.profiles enable row level security;` and `alter table public.user_contacts enable row level security;`.
+**Yes, explicitly hybrid, and named as such.** D17: `profiles` is trigger-created (minimal row on `auth.users` insert), `user_contacts` is onboarding-created (client insert via the existing self-owned policy). This isn't left as an abstract preference — it's stated as the concrete creation path for each table separately.
 
-## 5. Policies self-owned only
+## 5. `full_name` population — clearly resolved
 
-**Confirmed.** All six policies (`select`/`insert`/`update` × two tables) are scoped `to authenticated` with `using`/`with check` expressions comparing against `auth.uid()` — no `to public`, no `to anon`, no `using (true)`/`with check (true)`. Independently grepped for those patterns: zero matches.
+**Yes.** D17 and the updated `DATABASE.md` §1/§13 both state: the trigger seeds `full_name` from auth metadata (`full_name`, then `name`) or falls back to a neutral placeholder `New participant` when metadata is absent, with onboarding responsible for replacing the placeholder before registration or matching. This directly answers the `not null`/no-default question flagged in the `PHASE3C-001` review without requiring a schema change (no migration was added, correctly — a placeholder default resolves the constraint without altering the column).
 
-## 6. `profiles` access via `auth.uid() = id`
+## 6. `user_contacts` creation — clearly resolved
 
-**Correct**, and consistent with `profiles.id` being the documented sole exception to the `user_id` naming rule. All three `profiles` policies use `auth.uid() = id`.
+**Yes.** Explicitly assigned to client-side onboarding via the existing `user_contacts_insert_own` policy from `PHASE3C-001`, not the trigger. Stated once in D17 and consistently reflected in `DATABASE.md`'s `user_contacts` entry and data flow #2.
 
-One design point worth surfacing, not blocking: `/docs/RLS_ACCESS_MATRIX.md`'s existing `profiles INSERT` row currently reads "❌ / trigger only" for participant — implying insertion was expected to happen via a signup trigger, not a direct self-insert RLS policy. This task's own wording explicitly anticipated this ("if you judge this is needed given a signup trigger may not exist yet; use your judgment and explain the choice") and Codex made the call transparently, with reasoning, exactly as invited. It is not a scope violation. But it does mean `profiles_insert_own` and the documented "trigger only" stance are now slightly out of sync, and a human should decide — before the signup-trigger task is scoped — whether this self-insert policy stays permanently (defense in depth alongside a trigger) or is meant to be superseded/removed once the trigger exists. Flagging as a decision point, not a fix.
+## 7. Future of `profiles_insert_own` — clearly resolved
 
-## 7. `user_contacts` access via `user_id = auth.uid()`
+**Yes.** D17 states it plainly: "scaffolding from `PHASE3C-001`, kept only until the signup trigger is implemented and verified; a later separately approved RLS migration should remove or tighten direct profile inserts." This is not deferred as an open question — it's a stated position with an explicit trigger condition (trigger lands + is verified) for when it changes, and correctly does not attempt to implement that removal now.
 
-**Correct.** All three `user_contacts` policies use `auth.uid() = user_id`, matching the naming rule and the `user_id references profiles(id)` relationship from `PHASE3B-001`.
+## 8. Contact data remains private, `user_contacts`-only
 
-## 8. No public `profiles` table access yet
+**Confirmed, explicitly restated, not just left implicit.** D17: "private contact data remains only in `user_contacts`." `RLS_ACCESS_MATRIX.md`'s updated `user_contacts` note reiterates no organizer/judge/mentor/sponsor/public/cross-user access exists and that future reveal or organizer contact reads still require separately approved audited RPCs — consistent with `PHASE3B-001`/`PHASE3B-002`/`PHASE3C-001`, nothing walked back.
 
-**Confirmed.** Every `profiles` policy specifies `to authenticated`; there is no `select`/`insert`/`update` policy granted `to public` or `to anon`. The migration's own comment block states this explicitly as the intended stance, matching `/docs/RLS_ACCESS_MATRIX.md`'s note that public-safe profile reads must go through a future dedicated view/RPC, not the base table.
+## 9. Docs vs. current RLS direction — no longer contradictory
 
-## 9. No public/cross-user/organizer/sponsor access to `user_contacts`
+**Resolved.** This was the core defect being fixed: `RLS_ACCESS_MATRIX.md`'s `profiles INSERT` row previously read "trigger only," flatly contradicting the actual `profiles_insert_own` policy from `PHASE3C-001`. It now reads "🔶 own currently (`PHASE3C-001` scaffolding); D17 target is signup trigger, then separately approved RLS tightening" — this states the current reality, the target state, and the path between them in one cell, rather than picking one and hiding the other. Checked side by side against `supabase/migrations/20260710130000_identity_rls.sql` directly (not just trusting the summary): the row now accurately reflects what that file actually contains.
 
-**Confirmed.** No policy on `user_contacts` references any role, table, or condition other than the row's own `user_id` matching `auth.uid()`. No organizer/sponsor/judge/mentor policy exists on either table. This matches `/docs/PRIVACY_MODEL.md`'s stance that cross-user contact access must go through an audited RPC (`get_revealed_contacts`), never a direct table grant.
+## 10. No SQL/RLS/UI/Supabase work attempted
 
-## 10. No contact-reveal logic created
-
-**Confirmed.** The migration contains only `alter table ... enable row level security` and `create policy` / `comment on policy` statements. No function, RPC, view, or trigger implementing reveal logic appears anywhere.
+**Confirmed.** The diff contains only prose changes to three markdown files. No `supabase/migrations/` file was added or modified (still exactly the two files from `PHASE3B-001`/`PHASE3C-001`), no `create policy`/`alter table` statement appears anywhere in the diff, no `src/` file changed, no Supabase CLI or connection reference anywhere.
 
 ## 11. Forbidden identifier
 
-**Absent.** Independently grepped the full migration file for the string formed by `profile` + `_` + `id`: zero matches. (Policy names like `profiles_select_own`, `profiles_insert_own` do not contain the forbidden substring.)
+**Absent from everything Codex added.** A grep across the full diff does surface one match — but it's in an unchanged context line from the pre-existing `D16` entry ("CI grep (`git grep profile_id` must return nothing)"), which has documented the rule using that exact string since before this task and is not part of any `+`/`-` diff line. Confirmed by isolating added/removed lines specifically: zero matches in Codex's actual additions.
 
-## 12. No live Supabase operation attempted
+## 12. Verification
 
-**Confirmed.** This is a static SQL file under `supabase/migrations/`; nothing in the diff or `CODEX_SUMMARY.md`'s verification section references a CLI command, connection string, or apply/push/reset action.
+**Passes, independently re-run.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and the full `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` gate were all re-run fresh for this review and all passed cleanly.
 
-## 13. Absence of `DELETE` policies
+## 13. Next task named concretely enough
 
-**Intentional and acceptable for this phase.** Both tables have no `delete` policy — meaning no role (not even the owner) can delete rows directly under RLS as currently drafted; deletion would have to go through a future, separately-approved account-deletion flow (consistent with `/docs/PRIVACY_MODEL.md` §8's stated retention/deletion approach: anonymization, not a raw client-side delete). Codex stated this choice explicitly in the handoff rather than leaving it ambiguous, exactly as the task required.
+**Yes.** D17 and the handoff both state: "`PHASE3D-001` should implement the `auth.users` signup trigger described here and keep onboarding responsible for contact-row creation." That's specific enough to write directly into a task file's Objective/In-scope sections without further clarification — the trigger's exact behavior (minimal `profiles` row, `full_name` fallback chain, `user_contacts` left to onboarding) is already fully specified in D17 for that next task to implement against.
 
-## 14. Verification
+## 14. Fixes needed
 
-**Passes, independently re-run.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and the full `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` gate (including the forbidden-string scan, which now also covers the `supabase/` directory) were all re-run fresh for this review and all passed cleanly.
-
-## 15. Fixes needed
-
-**None required to approve this task.** One item to carry forward as a human decision, not a code fix: confirm before the signup-trigger task is scoped whether `profiles_insert_own` should remain alongside a future trigger or be reconsidered at that point — see §6.
+**None.**
 
 ## Summary
 
-PHASE3C-001 delivers a correctly deny-by-default RLS draft for exactly the two approved tables, with no scope creep into reveal logic, organizer/sponsor access, or any other table. Approved. Carry the `profiles_insert_own` vs. signup-trigger question into the next identity-related task as an explicit decision, not a silent default.
+PHASE3D-000 does exactly what a decision task should: it turns an ambiguity flagged in a prior review into one explicit, cross-referenced position, updates the two docs that were actually contradicting reality, correctly leaves the one doc that didn't need touching alone, and hands the next task a specific, implementable brief. Approved. Recommend writing `PHASE3D-001` (the signup trigger) directly from D17's terms.

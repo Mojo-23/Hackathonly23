@@ -9,14 +9,14 @@ Legend: ✅ allowed · 🔶 allowed with condition · ❌ denied · RPC = only t
 | Table | anon | participant | organizer | judge | mentor | platform_admin |
 |---|---|---|---|---|---|---|
 | profiles SELECT | ❌ | 🔶 own row full; others only via `public_profile` view (no contact data) | 🔶 registrants of own events via RPC for safe profile fields | ❌ (names via submission views only) | ❌ | ✅ |
-| profiles INSERT | ❌ | trigger only | — | — | — | — |
+| profiles INSERT | ❌ | 🔶 own currently (`PHASE3C-001` scaffolding); D17 target is signup trigger, then separately approved RLS tightening | — | — | — | — |
 | profiles UPDATE | ❌ | 🔶 own | ❌ | ❌ | ❌ | ✅ |
 | profiles DELETE | ❌ | 🔶 own (account deletion flow, cascades per PRIVACY_MODEL) | ❌ | ❌ | ❌ | ✅ |
 | organizations R / W | ✅ verified only / ❌ | ✅ verified / ❌ | 🔶 own org / own org (owner-admin) | ❌ | ❌ | ✅ |
 | organization_members | ❌ | 🔶 own memberships | 🔶 own org read; owner/admin manage | ❌ | ❌ | ✅ |
 | event_roles | ❌ | 🔶 own rows | 🔶 own events manage | 🔶 own row | 🔶 own row | ✅ |
 
-`user_contacts` is a private P3 contact-data table added in `PHASE3B-001`; it needs its own access-matrix row and separately approved RLS policy before implementation.
+`user_contacts` is a private P3 contact-data table added in `PHASE3B-001`. `PHASE3C-001` grants authenticated users self-owned SELECT/INSERT/UPDATE only (`user_id = auth.uid()`), so D17 assigns contact-row creation to onboarding. No organizer, judge, mentor, sponsor, public, or cross-user contact access exists; future reveal or organizer contact reads still require separately approved audited RPCs.
 
 ## Hackathons & registration
 

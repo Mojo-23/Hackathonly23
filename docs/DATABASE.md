@@ -11,14 +11,14 @@ Privacy levels used below: **P0** public · **P1** authenticated/event-scoped ·
 ## 1. Identity & access
 
 ### profiles (P2)
-Who a user is, platform-wide. One row per auth user, created by trigger on signup. Identity/display data only; private contact fields live in `user_contacts`.
+Who a user is, platform-wide. One row per auth user, created by trigger on signup per D17. The trigger seeds `full_name` from auth metadata (`full_name`, then `name`) or `New participant` when metadata is absent; onboarding must replace placeholders before registration or matching. Identity/display data only; private contact fields live in `user_contacts`.
 - `id uuid pk references auth.users(id)` — **the naming-rule exception**
 - `full_name text not null`, `university text`, `major text`, `graduation_year integer`, `governorate text`, `city text`, `bio text`, `github_url text`, `linkedin_url text`, `portfolio_url text`, `experience_level text` (`beginner|intermediate|advanced`), `primary_role text` (`frontend|backend|fullstack|mobile|ai_ml|data|design|product|business|cyber|hardware`), `looking_for_team boolean default false`, `created_at`, `updated_at`
 - Ownership: the user. RLS: user reads/updates own row. Others **never** select this table directly — privacy-safe fields exposed via `public_profile` view / RPCs (no contact data). Organizer access to registrant contact goes through application-scoped RPC, audited.
 - Indexes: `(university)`.
 
 ### user_contacts (P3)
-Private contact data for a user. One row per user; this is the storage location for email, phone, and WhatsApp contact details.
+Private contact data for a user. One row per user, created by client-side onboarding through the self-owned insert policy rather than by the signup trigger. This is the storage location for email, phone, and WhatsApp contact details.
 - `id uuid pk default gen_random_uuid()`
 - `user_id uuid not null references profiles(id) on delete cascade`, unique
 - `email text`, `phone text`, `whatsapp text`, `preferred_contact_method text` (`email|phone|whatsapp`), `created_at`, `updated_at`
@@ -203,8 +203,8 @@ profiles ─ talent_opt_ins / consent_records / audit_logs
 
 ## 13. Data flows (16)
 
-1. **Signup** — Supabase Auth → trigger inserts `profiles` (id = auth uid) → redirect to profile completion.
-2. **Profile creation** — user updates own `profiles` row for identity/display data and own `user_contacts` row for private contact data. Cross-user contact reads go through the reveal/organizer RPC path once approved.
+1. **Signup** — Supabase Auth → trigger inserts minimal `profiles` row (id = auth uid, `full_name` from auth metadata or `New participant` placeholder per D17) → redirect to onboarding.
+2. **Profile completion** — user updates own `profiles` row for identity/display data and inserts/updates own `user_contacts` row for private contact data. The current direct profile insert policy is temporary scaffolding until the signup trigger lands and is verified; cross-user contact reads go through the reveal/organizer RPC path once approved.
 3. **Event registration** — server action validates consents → insert `hackathon_applications` + `consent_records` rows (one RPC, atomic).
 4. **Consent recording** — every consent change (grant or revoke) appends `consent_records`; denormalized flag updated in same transaction.
 5. **Matching opt-in** — `wants_matching=true` + `matching_pool_visibility` consent record + `matching_preferences` row → appears in `matching_pool` view (privacy-safe fields only).

@@ -50,6 +50,9 @@ Prevents the "we emailed you a newer version" chaos. Late-submission grace is an
 ## D16 — Naming rule accepted
 `user_id` everywhere; `profiles.id` the sole exception. No technical objection; CI grep (`git grep profile_id` must return nothing) added to the checklist from Phase 3 onward.
 
+## D17 — Identity creation path: trigger-created profile, onboarding-created contacts
+Canonical account creation is hybrid. A Phase 3 signup trigger creates the minimal `profiles` row immediately when `auth.users` receives a new user, with `profiles.id = auth.uid()` and `full_name` populated from trusted auth metadata (`full_name`, then `name`) or the neutral placeholder `New participant` when metadata is absent. Onboarding must collect the real display name before event registration or matching. `user_contacts` is not trigger-created; onboarding inserts or updates the user's own contact row through the existing self-owned policy, and private contact data remains only in `user_contacts`. The current `profiles_insert_own` policy is scaffolding from `PHASE3C-001`, kept only until the signup trigger is implemented and verified; a later separately approved RLS migration should remove or tighten direct profile inserts. Next task: `PHASE3D-001` should implement the `auth.users` signup trigger described here and keep onboarding responsible for contact-row creation.
+
 ## Ideas proposed (mine), with build-now/later verdicts
 
 **Build in V1 (cheap, high-leverage):**
