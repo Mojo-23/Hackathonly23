@@ -151,6 +151,15 @@ Write-Host "Launching Codex ($CodexCommand exec -s $Sandbox)..." -ForegroundColo
 $exitCode = $LASTEXITCODE
 
 # --- Post-run: always show what actually changed, regardless of outcome ---
+# Git may write harmless advisory warnings to stderr here (e.g. LF/CRLF
+# normalization notices). Under $ErrorActionPreference = "Stop", Windows
+# PowerShell 5.1 can treat that stderr output as a terminating error even
+# though git's own exit code is 0 -- the same class of issue already
+# handled for the precondition check above. Relax to "Continue" for every
+# git reporting call in this block, then restore afterward.
+$priorPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+
 Write-Host ""
 Write-Host "==> git status after the run" -ForegroundColor Cyan
 git status --short
@@ -159,6 +168,14 @@ Write-Host ""
 Write-Host "==> git diff summary" -ForegroundColor Cyan
 git diff --stat
 git diff --stat --cached
+
+# --- Post-run: /docs, AGENTS.md, and CLAUDE.md are off-limits by default ---
+$changedFiles = @()
+$changedFiles += git diff --name-only HEAD 2>$null
+$changedFiles += git ls-files --others --exclude-standard 2>$null
+$changedFiles = $changedFiles | Where-Object { $_ } | Select-Object -Unique
+
+$ErrorActionPreference = $priorPreference
 
 if ($exitCode -ne 0) {
     Write-Host "Codex exited with code $exitCode." -ForegroundColor Red
@@ -171,12 +188,6 @@ if (-not (Test-Path $summaryPath)) {
     Write-Host "Codex run finished but /handoff/CODEX_SUMMARY.md was not written. This is required -- treat the run as incomplete." -ForegroundColor Red
     exit 1
 }
-
-# --- Post-run: /docs, AGENTS.md, and CLAUDE.md are off-limits by default ---
-$changedFiles = @()
-$changedFiles += git diff --name-only HEAD 2>$null
-$changedFiles += git ls-files --others --exclude-standard 2>$null
-$changedFiles = $changedFiles | Where-Object { $_ } | Select-Object -Unique
 
 $offLimits = $changedFiles | Where-Object {
     $_ -match "^docs/" -or $_ -eq "AGENTS.md" -or $_ -eq "CLAUDE.md"
