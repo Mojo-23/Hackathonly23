@@ -10,12 +10,21 @@ Privacy levels used below: **P0** public · **P1** authenticated/event-scoped ·
 
 ## 1. Identity & access
 
-### profiles (P2; contact fields P3)
-Who a user is, platform-wide. One row per auth user, created by trigger on signup.
+### profiles (P2)
+Who a user is, platform-wide. One row per auth user, created by trigger on signup. Identity/display data only; private contact fields live in `user_contacts`.
 - `id uuid pk references auth.users(id)` — **the naming-rule exception**
-- `full_name`, `email` (synced from auth), `phone` (P3), `university`, `major`, `graduation_year int`, `city` (governorate enum or text), `primary_role` enum (`frontend|backend|fullstack|mobile|ai_ml|data|design|product|business|cyber|hardware`), `skills text[]`, `experience_level` enum (`beginner|intermediate|advanced`), `github_url`, `linkedin_url`, `portfolio_url`, `bio`, `avatar_url`
-- Ownership: the user. RLS: user reads/updates own row. Others **never** select this table directly — privacy-safe fields exposed via `public_profile` view / RPCs (no email/phone). Organizer access to registrant contact goes through application-scoped RPC, audited.
-- Indexes: `(university)`, GIN `(skills)`.
+- `full_name text not null`, `university text`, `major text`, `graduation_year integer`, `governorate text`, `city text`, `bio text`, `github_url text`, `linkedin_url text`, `portfolio_url text`, `experience_level text` (`beginner|intermediate|advanced`), `primary_role text` (`frontend|backend|fullstack|mobile|ai_ml|data|design|product|business|cyber|hardware`), `looking_for_team boolean default false`, `created_at`, `updated_at`
+- Ownership: the user. RLS: user reads/updates own row. Others **never** select this table directly — privacy-safe fields exposed via `public_profile` view / RPCs (no contact data). Organizer access to registrant contact goes through application-scoped RPC, audited.
+- Indexes: `(university)`.
+
+### user_contacts (P3)
+Private contact data for a user. One row per user; this is the storage location for email, phone, and WhatsApp contact details.
+- `id uuid pk default gen_random_uuid()`
+- `user_id uuid not null references profiles(id) on delete cascade`, unique
+- `email text`, `phone text`, `whatsapp text`, `preferred_contact_method text` (`email|phone|whatsapp`), `created_at`, `updated_at`
+- Ownership: the user. Future RLS/contact-reveal work must treat this as P3 data and expose cross-user reads only through audited reveal/organizer RPCs once separately approved.
+
+Note: `PHASE3B-001` intentionally corrected the earlier inline-contact `profiles` shape by splitting private contact fields into `user_contacts`; see `supabase/migrations/20260710120000_identity_foundation.sql`.
 
 ### organizations (P1)
 Organizer entities (university club, company, NGO).
@@ -195,7 +204,7 @@ profiles ─ talent_opt_ins / consent_records / audit_logs
 ## 13. Data flows (16)
 
 1. **Signup** — Supabase Auth → trigger inserts `profiles` (id = auth uid) → redirect to profile completion.
-2. **Profile creation** — user updates own `profiles` row (RLS: self only). Contact fields never leave this table except via reveal RPC.
+2. **Profile creation** — user updates own `profiles` row for identity/display data and own `user_contacts` row for private contact data. Cross-user contact reads go through the reveal/organizer RPC path once approved.
 3. **Event registration** — server action validates consents → insert `hackathon_applications` + `consent_records` rows (one RPC, atomic).
 4. **Consent recording** — every consent change (grant or revoke) appends `consent_records`; denormalized flag updated in same transaction.
 5. **Matching opt-in** — `wants_matching=true` + `matching_pool_visibility` consent record + `matching_preferences` row → appears in `matching_pool` view (privacy-safe fields only).

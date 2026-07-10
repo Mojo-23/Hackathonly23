@@ -8,13 +8,15 @@ Legend: ✅ allowed · 🔶 allowed with condition · ❌ denied · RPC = only t
 
 | Table | anon | participant | organizer | judge | mentor | platform_admin |
 |---|---|---|---|---|---|---|
-| profiles SELECT | ❌ | 🔶 own row full; others only via `public_profile` view (no email/phone) or reveal RPC | 🔶 registrants of own events via RPC incl. contact (audited) | ❌ (names via submission views only) | ❌ | ✅ |
+| profiles SELECT | ❌ | 🔶 own row full; others only via `public_profile` view (no contact data) | 🔶 registrants of own events via RPC for safe profile fields | ❌ (names via submission views only) | ❌ | ✅ |
 | profiles INSERT | ❌ | trigger only | — | — | — | — |
 | profiles UPDATE | ❌ | 🔶 own | ❌ | ❌ | ❌ | ✅ |
 | profiles DELETE | ❌ | 🔶 own (account deletion flow, cascades per PRIVACY_MODEL) | ❌ | ❌ | ❌ | ✅ |
 | organizations R / W | ✅ verified only / ❌ | ✅ verified / ❌ | 🔶 own org / own org (owner-admin) | ❌ | ❌ | ✅ |
 | organization_members | ❌ | 🔶 own memberships | 🔶 own org read; owner/admin manage | ❌ | ❌ | ✅ |
 | event_roles | ❌ | 🔶 own rows | 🔶 own events manage | 🔶 own row | 🔶 own row | ✅ |
+
+`user_contacts` is a private P3 contact-data table added in `PHASE3B-001`; it needs its own access-matrix row and separately approved RLS policy before implementation.
 
 ## Hackathons & registration
 
@@ -37,7 +39,7 @@ Legend: ✅ allowed · 🔶 allowed with condition · ❌ denied · RPC = only t
 | team_proposal_members | 🔶 read if member of proposal; update own response via RPC | 🔶 read | state machine in `respond_to_proposal` |
 | teams / team_members | 🔶 event participants read roster (safe fields); members update team name | 🔶 own events manage | |
 | contact_reveals | 🔶 read rows where viewer = self | 🔶 own events read | INSERT via RPC only; never update/delete |
-| contact info of teammates | 🔶 via `get_revealed_contacts(team_id)` RPC — checks reveal row exists | ✅ via audited RPC | the only path to another user's phone/email |
+| contact info of teammates | 🔶 via `get_revealed_contacts(team_id)` RPC — checks reveal row exists | ✅ via audited RPC | the only path to another user's contact fields in `user_contacts` |
 
 ## Check-in, submissions, judging, mentors
 

@@ -9,9 +9,10 @@ Privacy is the product's differentiator, not a compliance checkbox. Core promise
 | P0 Public | Published event data | Event pages, tracks, published winners |
 | P1 Event-scoped | Participation data visible inside an event context | Pool cards, team rosters, submissions (to organizer/judges) |
 | P2 Owner + organizer | Operational records | Applications, check-ins, scores, reports |
-| P3 Protected | Contact info, consents, tokens, audit | phone, email, check_in_token, consent_records, audit_logs, talent opt-ins |
+| P3 Protected | Contact info, consents, tokens, audit | phone/email/WhatsApp in `user_contacts`, check_in_token, consent_records, audit_logs, talent opt-ins |
 
 P3 data never appears in a client-readable SELECT except to its owner. Cross-user access to P3 goes through security-definer RPCs that check an explicit grant (`contact_reveals`, consent flags) and write `audit_logs`.
+Private contact fields live in `user_contacts`; `profiles` contains identity/display data only.
 
 ## 2. Roles of the parties
 
@@ -36,7 +37,7 @@ UI rules: mandatory and optional visually separated; optional never pre-checked;
 
 1. Pool and proposal views are built on views/RPCs exposing only: display name (first name + last initial pre-team; full name post-team), primary role, skills, experience level, university, matching notes. Never email, phone, or profile links pre-reveal.
 2. `respond_to_proposal` RPC: on final acceptance, in one transaction — proposal→accepted, team created, pairwise `contact_reveals` inserted, audit rows written.
-3. `get_revealed_contacts(team_id)` is the **only** read path to another user's phone/email/links; it verifies a reveal row for (viewer, subject).
+3. `get_revealed_contacts(team_id)` is the **only** read path to another user's `user_contacts` fields; it verifies a reveal row for (viewer, subject). Profile links remain hidden pre-reveal and may only be exposed through the same approved reveal-safe path.
 4. A decline releases everyone silently — members see "proposal didn't complete", not who declined (prevents social retaliation, a real dynamic in a small market like Jordan).
 5. Pre-formed team path: joining via invite code *is* mutual consent — reveal rows are created among members on join (reason `team_formed`), consistent promise: contact sharing always follows an explicit mutual action.
 6. Organizer access to registrant contact info is legitimate (they run the event, participants consented) but goes through an audited RPC so every access is logged.

@@ -1,31 +1,29 @@
 # Codex Summary
 
 ## Task
-`PHASE3B-001`
+`PHASE3B-002`
 
 ## What changed
-- Added one draft Supabase migration: `supabase/migrations/20260710120000_identity_foundation.sql`.
-- Created `public.profiles` for identity/display data only:
-  - `id uuid primary key references auth.users(id)`
-  - `full_name`, university/education/location fields, bio/link fields, role/experience fields, `looking_for_team`, and timestamps.
-  - No contact fields exist on `profiles`.
-- Created `public.user_contacts` for private contact data:
-  - `user_id uuid not null references public.profiles(id) on delete cascade`
-  - `email`, `phone`, `whatsapp`, `preferred_contact_method`, and timestamps.
-  - A unique constraint enforces one contact row per user. That unique constraint also provides the indexed lookup path for `user_id`.
-- Added a shared `public.set_updated_at()` trigger function and update triggers for both tables.
-- Added comments documenting that `profiles` is display data and that private contact reads must come from `user_contacts`, not `profiles`.
-
-I used check constraints rather than Postgres enum types for `experience_level`, `primary_role`, and `preferred_contact_method`. That keeps this first draft simple and easy to change before the schema is ever applied; Claude/human can still standardize on enum types in a later approved migration task if desired.
+- Updated `docs/DATABASE.md` so `profiles` is documented as identity/display data only, matching `supabase/migrations/20260710120000_identity_foundation.sql`.
+- Added a `docs/DATABASE.md` section for `user_contacts` as private P3 contact data, including its columns and `user_id -> profiles(id) on delete cascade` relationship.
+- Added a short `PHASE3B-001` history note in `docs/DATABASE.md` pointing to `supabase/migrations/20260710120000_identity_foundation.sql`.
+- Updated `docs/RLS_ACCESS_MATRIX.md` to acknowledge `user_contacts` as a private contact-data table that needs a future approved access-matrix row/RLS policy, without drafting a policy.
+- Updated `docs/PRIVACY_MODEL.md` so protected contact data is described as living in `user_contacts`, not `profiles`.
 
 ## Files touched
-- `supabase/migrations/20260710120000_identity_foundation.sql`
-- `handoff/CODEX_SUMMARY.md`
+- `docs/DATABASE.md` - reconciled `profiles` and `user_contacts` documentation with the approved migration.
+- `docs/RLS_ACCESS_MATRIX.md` - added a concise acknowledgment for future `user_contacts` RLS work and adjusted contact wording.
+- `docs/PRIVACY_MODEL.md` - clarified protected contact-data storage and reveal wording.
+- `handoff/CODEX_SUMMARY.md` - this handoff.
+
+`docs/PRODUCT_DECISIONS.md` was checked and did not need a change; there was no existing decision entry describing the stale inline-contact `profiles` shape.
 
 ## Verification
-- Manual SQL sanity read: passed.
-- Confirmed no RLS enablement or policy statements were added.
-- Confirmed no live Supabase command was run.
+- Re-read the edited `docs/DATABASE.md` sections against `supabase/migrations/20260710120000_identity_foundation.sql`: passed.
+- Confirmed the `profiles` and `user_contacts` column lists in `docs/DATABASE.md` now match the migration exactly.
+- `npm run build`: passed.
+- `npx tsc --noEmit`: passed.
+- `npx eslint .`: passed.
 - `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`: passed.
   - `npm run build`: OK
   - `npx tsc --noEmit`: OK
@@ -33,7 +31,8 @@ I used check constraints rather than Postgres enum types for `experience_level`,
   - forbidden naming scan: OK
 
 ## Deviations
-- None from the task scope. No docs, workflow files, scripts, UI, auth code, RLS policy, contact-reveal function, or live database operation was added.
+- None. No SQL, migration, RLS policy, product code, or UI file appears in the diff.
+- No files outside the task's expected change list were touched.
 
 ## Open questions
-- `/docs/DATABASE.md` still documents the older shape with contact data inline on `profiles`. This task explicitly approved the migration-only divergence and kept `/docs` read-only, so Claude/human should reconcile the doc in a separate dedicated step.
+- None.
