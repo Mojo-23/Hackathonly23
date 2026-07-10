@@ -1,73 +1,63 @@
-# Claude Review — PHASE3E-001
+# Claude Review — PHASE3E-002
 
 ## 1. Verdict
 
 **APPROVE**
 
-The test suite is thorough, correctly scoped to local-only operations, uses obviously synthetic data with clean rollback semantics, avoids the forbidden identifier via the same runtime-construction technique used elsewhere in this repo, and every claim in `CODEX_SUMMARY.md` was independently re-verified — not just trusted. One minor coverage gap is noted as an advisory, not a blocker.
+The three new tests correctly isolate each remaining fallback branch, use distinct synthetic UUIDs, correctly extend the existing cleanup pattern to cover them, and get the `plan()` count right on the first try — the exact mistake flagged for avoidance in the task itself. Every claim in `CODEX_SUMMARY.md` was independently re-verified.
 
 ## 2. Scope containment
 
-**Held.** The test directory was untracked, so I read the file directly (per your instruction) rather than relying on `git diff --stat` — confirmed via `git status --short` (`?? supabase/tests/`) and a full direct read of `supabase/tests/database/identity_foundation.test.sql`. `git status --short supabase/migrations/ docs/` returned nothing — no migration and no doc was touched. Diff is exactly that one test file plus the standard `handoff/CODEX_SUMMARY.md` write.
+**Held.** `git status --short` shows exactly `supabase/tests/database/identity_foundation.test.sql` (modified) plus the standard `handoff/CODEX_SUMMARY.md` write. `git status --short supabase/migrations/ docs/` returned nothing — no migration, no doc touched. I read the full diff directly rather than relying on a summary description.
 
-## 3. Tests located under `supabase/tests/`
+## 3. Only `supabase/tests` and handoff changed
 
-**Confirmed.** `supabase/tests/database/identity_foundation.test.sql` — one file, correctly placed for `supabase test db --local supabase/tests` discovery.
+**Confirmed.** No RLS policy, product code, UI, script, or config file appears anywhere in the diff.
 
-## 4. `profiles`/`user_contacts` existence
+## 4. `raw_user_meta_data->>'name'` covered
 
-**Confirmed.** Tests 1–2 use `has_table('public', 'profiles', ...)` and `has_table('public', 'user_contacts', ...)`.
+**Confirmed, and correctly isolated.** The new test (line ~285) supplies `jsonb_build_object('name', 'Synthetic Name Fallback')` with no `full_name` key present, then asserts `profiles.full_name = 'Synthetic Name Fallback'` — this genuinely exercises the second `coalesce` branch, not just the first one with an unused extra key.
 
-## 5. Contact data not in `profiles`
+## 5. `raw_user_meta_data->>'display_name'` covered
 
-**Confirmed, and more thorough than the minimum.** Tests 3–5 check the three named columns are absent (`hasnt_column`); test 6 goes further with a regex scan (`column_name ~ '(email|phone|whatsapp|contact)'`) across `information_schema.columns`, catching any differently-named contact-shaped column too, not just the three anticipated names.
+**Confirmed, and correctly isolated.** Supplies only `display_name` (no `full_name`, no `name`), asserts the result equals it — correctly exercises the third branch specifically, since the first two are provably absent from the input.
 
-## 6. Contact data in `user_contacts`
+## 6. Placeholder `'New participant'` fallback covered
 
-**Confirmed.** Tests 7–9 (`has_column`) for `email`, `phone`, `whatsapp`.
+**Confirmed, and correctly isolated.** Supplies `jsonb_build_object('unrelated_key', 'ignored synthetic value')` — none of the three recognized keys present — and asserts `full_name = 'New participant'`. This is the right way to test a default/placeholder path: prove none of the preceding conditions can fire, not just assert the outcome.
 
-## 7. RLS enabled
+## 7. Original `full_name` fallback test still exists
 
-**Confirmed, checked against `pg_class.relrowsecurity` directly** (tests 10–11) rather than inferring it from policy presence alone — the correct way to verify RLS is actually *enabled*, not just that policies exist. Codex also added six extra tests (12–17) confirming each specific self-owned policy name/command exists on both tables — not explicitly required by the task's eleven-item list, but a reasonable, in-spirit extension given the task's own "Relevant docs" section pointed at `RLS_ACCESS_MATRIX.md`'s self-owned-only description as what these tests should confirm.
+**Confirmed.** Read the full file directly (not just the diff): the original `PHASE3E-001` test block (insert for UUID `11111111-...`, then the three assertions "exactly one profile row," "non-null `full_name`," "`full_name` comes from auth metadata") is untouched and intact, immediately preceding the three new blocks.
 
-## 8. Signup trigger exists
+## 8. Synthetic, local-only data
 
-**Confirmed.** Test 18 checks `pg_proc` for `create_profile_for_new_user` with 0 args and `trigger` return type — matching the actual function signature in `20260710140000_signup_profile_trigger.sql`, not a guessed name. Test 19 confirms the `auth.users` trigger `create_profile_after_signup` is wired to that exact function via a `pg_trigger`/`pg_proc` join.
+**Confirmed.** Three new UUIDs (`22222222-...`, `33333333-...`, `44444444-...`), each distinct from each other and from the `PHASE3E-001` UUID, exactly as required. All new emails use the `.invalid` TLD, consistent with established convention. Independently grepped for JWT/key-shaped secrets: zero matches.
 
-## 9. Signup creates a `profiles` row
+## 9. Cleanup / rollback safety
 
-**Confirmed, and behaviorally exercised, not just structurally asserted.** A synthetic `auth.users` row is inserted (test setup), then test 20 asserts exactly one matching `profiles` row exists, test 21 asserts `full_name` is non-null, and test 22 asserts it equals the exact metadata value supplied (`'Synthetic Signup Tester'`) — a real behavioral check of the trigger's primary fallback path, not just "some string exists."
+**Confirmed, and correctly extended, not just left as-is.** The pre-test guard-delete blocks (for `user_contacts`, `profiles`, `auth.users`) were extended from a single `where id = '...'` to `where id in (...)` covering all four synthetic UUIDs — this matters, because leaving the old single-id guard would have meant a prior interrupted run of the *new* tests wouldn't be cleaned up before a fresh run. The entire test body, including all three new inserts, remains inside the same `begin; ... rollback;` block that was already established — confirmed by reading to the end of the file: `rollback;` is still the last statement, after `finish()`.
 
-Minor coverage gap, not a blocker: only the first branch of D17's four-step fallback chain (`raw_user_meta_data->>'full_name'`) is exercised. The `name`/`display_name`/placeholder fallback branches aren't tested here. The task's acceptance criteria only required "a non-null `full_name`," which is met — but a future task could usefully add 2–3 more synthetic-insert cases exercising the other fallback branches for full confidence in D17's chain, not just its first link.
+## 10. `plan()` count correctness
 
-## 10. Signup does not create a `user_contacts` row
+**Correct: `select plan(28);`.** Independently recounted every test-producing statement in the file by hand (not just trusting the count): 2 `has_table` + 3 `hasnt_column` + 1 `ok` (contact-shaped scan) + 3 `has_column` + 2 `ok` (RLS enabled) + 6 `ok` (policy existence) + 1 `ok` (trigger function) + 1 `ok` (trigger wiring) + 3 (original signup behavior: count, non-null, equals-metadata) + 3 (new fallback branches) + 1 (`user_contacts` count = 0) + 1 (no contact leak) + 1 (forbidden-identifier guard) = **28**, matching both the declared plan and the actual local test run result.
 
-**Confirmed.** Test 23 asserts `count(*) = 0` in `user_contacts` for the synthetic user id after signup.
+## 11. `npx supabase db reset` passes
 
-## 11. Synthetic, local-only data
+**Confirmed, independently re-run.** All three migrations applied cleanly; the same informational `WARN: no files matched pattern: supabase/seed.sql` appeared as in prior runs — expected, no seed file exists yet, does not affect correctness.
 
-**Confirmed, well-chosen values.** UUID `11111111-1111-4111-8111-111111111111`, email `test-signup-001@example.invalid` (`.invalid` is the RFC 2606-reserved TLD for exactly this purpose), phone/WhatsApp values using the `555` exchange (the standard reserved-fake NANP prefix), and an obviously synthetic display name. No real data, no real credential, no real Supabase URL/key anywhere — independently grepped for JWT-shaped and key-shaped strings, zero matches. Cleanup is handled correctly: a pre-test `delete` guards against a prior interrupted run leaving residue, and the actual test body runs inside `begin; ... rollback;`, so a normal successful run leaves no synthetic data behind.
+## 12. `npx supabase test db --local supabase/tests` passes
 
-## 12. Forbidden identifier avoided as a literal
+**Confirmed, independently re-run.** `Files=1, Tests=28, Result: PASS` — matches `CODEX_SUMMARY.md` and your reported result exactly.
 
-**Confirmed by direct grep of the file: zero matches for the literal string.** Test 25 builds the forbidden pattern at query-runtime via `concat('%', 'profile', chr(95), 'id', '%')` — the same technique already used in `scripts/run-codex-task.ps1` to avoid the literal substring appearing in source while still checking for it functionally. This test scans relevant table/column/function/trigger/policy names across `public.profiles`, `public.user_contacts`, and `auth.users` for that pattern.
-
-## 13. `npx supabase db reset` passes
-
-**Confirmed, independently re-run.** I ran it myself: all three migrations applied cleanly. One informational `WARN: no files matched pattern: supabase/seed.sql` appeared, matching what `CODEX_SUMMARY.md` reported — this is expected (no seed file exists yet in this project) and does not affect reset success or test correctness.
-
-## 14. `npx supabase test db --local supabase/tests` passes
-
-**Confirmed, independently re-run.** `Files=1, Tests=25, Result: PASS` — matches your reported result exactly.
-
-## 15. `verify.ps1` passes
+## 13. `verify.ps1` passes
 
 **Confirmed, independently re-run.** All four steps (build, typecheck, lint, forbidden-string scan) passed cleanly.
 
-## 16. Fixes needed
+## 14. Fixes needed
 
-**None required to approve this task.** One advisory for a future task, not this one: add synthetic-insert coverage for the remaining `full_name` fallback branches (`name`, `display_name`, placeholder) — see §9.
+**None.** This task fully closes the `PHASE3E-001` advisory with no new gaps introduced.
 
 ## Summary
 
-PHASE3E-001 delivers a genuinely thorough, correctly-scoped local test suite: structural checks for both tables and their columns, RLS enablement verified at the catalog level (not inferred), trigger existence and wiring verified against actual object names read from the migration files, a real behavioral exercise of the signup path with a whole-row leak check for contact values, and a forbidden-identifier guard that itself follows the project's established pattern for not writing the literal string. Approved. Local-only command discipline was maintained throughout — no remote connection, push, or SQL Editor use anywhere.
+PHASE3E-002 does exactly what a coverage-gap-closing task should: it adds precisely the three missing test cases, each correctly isolated to prove its specific branch rather than merely exercising the trigger again, extends the cleanup pattern to match the new fixtures, and gets the easy-to-get-wrong bookkeeping detail (the `plan()` count) right without a retry. All four branches of D17's `full_name` fallback chain are now behaviorally verified. Approved.

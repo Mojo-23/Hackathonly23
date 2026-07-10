@@ -1,16 +1,31 @@
--- Remove only this test's synthetic row if a prior local run was interrupted.
+-- Remove only this test's synthetic rows if a prior local run was interrupted.
 delete from public.user_contacts
-where user_id = '11111111-1111-4111-8111-111111111111';
+where user_id in (
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444'
+);
 
 delete from public.profiles
-where id = '11111111-1111-4111-8111-111111111111';
+where id in (
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444'
+);
 
 delete from auth.users
-where id = '11111111-1111-4111-8111-111111111111';
+where id in (
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+  '44444444-4444-4444-8444-444444444444'
+);
 
 begin;
 
-select plan(25);
+select plan(28);
 
 -- Identity tables must exist because profiles hold display data and user_contacts holds P3 contact data.
 select has_table('public', 'profiles', 'public.profiles exists');
@@ -240,6 +255,126 @@ select is(
   ),
   'Synthetic Signup Tester',
   'signup profile full_name comes from auth metadata'
+);
+
+-- Fallback branch: name is used when full_name is absent.
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  phone,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '22222222-2222-4222-8222-222222222222',
+  'authenticated',
+  'authenticated',
+  'test-signup-name-fallback@example.invalid',
+  null,
+  crypt('synthetic-password-not-secret', gen_salt('bf')),
+  now(),
+  '{"provider": "email", "providers": ["email"]}'::jsonb,
+  jsonb_build_object('name', 'Synthetic Name Fallback'),
+  now(),
+  now()
+);
+
+select is(
+  (
+    select full_name
+    from public.profiles
+    where id = '22222222-2222-4222-8222-222222222222'
+  ),
+  'Synthetic Name Fallback',
+  'signup profile full_name falls back to name metadata'
+);
+
+-- Fallback branch: display_name is used when full_name and name are absent.
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  phone,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '33333333-3333-4333-8333-333333333333',
+  'authenticated',
+  'authenticated',
+  'test-signup-display-fallback@example.invalid',
+  null,
+  crypt('synthetic-password-not-secret', gen_salt('bf')),
+  now(),
+  '{"provider": "email", "providers": ["email"]}'::jsonb,
+  jsonb_build_object('display_name', 'Synthetic Display Fallback'),
+  now(),
+  now()
+);
+
+select is(
+  (
+    select full_name
+    from public.profiles
+    where id = '33333333-3333-4333-8333-333333333333'
+  ),
+  'Synthetic Display Fallback',
+  'signup profile full_name falls back to display_name metadata'
+);
+
+-- Fallback branch: placeholder is used when no supported name metadata is present.
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  phone,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '44444444-4444-4444-8444-444444444444',
+  'authenticated',
+  'authenticated',
+  'test-signup-placeholder-fallback@example.invalid',
+  null,
+  crypt('synthetic-password-not-secret', gen_salt('bf')),
+  now(),
+  '{"provider": "email", "providers": ["email"]}'::jsonb,
+  jsonb_build_object('unrelated_key', 'ignored synthetic value'),
+  now(),
+  now()
+);
+
+select is(
+  (
+    select full_name
+    from public.profiles
+    where id = '44444444-4444-4444-8444-444444444444'
+  ),
+  'New participant',
+  'signup profile full_name falls back to the placeholder'
 );
 
 select is(
