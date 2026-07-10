@@ -1,38 +1,63 @@
-# Codex Summary
-
-## Task
-`PHASE3B-002`
+# Codex Summary - PHASE3C-001
 
 ## What changed
-- Updated `docs/DATABASE.md` so `profiles` is documented as identity/display data only, matching `supabase/migrations/20260710120000_identity_foundation.sql`.
-- Added a `docs/DATABASE.md` section for `user_contacts` as private P3 contact data, including its columns and `user_id -> profiles(id) on delete cascade` relationship.
-- Added a short `PHASE3B-001` history note in `docs/DATABASE.md` pointing to `supabase/migrations/20260710120000_identity_foundation.sql`.
-- Updated `docs/RLS_ACCESS_MATRIX.md` to acknowledge `user_contacts` as a private contact-data table that needs a future approved access-matrix row/RLS policy, without drafting a policy.
-- Updated `docs/PRIVACY_MODEL.md` so protected contact data is described as living in `user_contacts`, not `profiles`.
+
+Drafted one new SQL migration:
+
+- `supabase/migrations/20260710130000_identity_rls.sql`
+
+The migration:
+
+- Enables RLS on `public.profiles`.
+- Enables RLS on `public.user_contacts`.
+- Adds self-owned `select`, `insert`, and `update` policies for both tables.
+- Adds SQL comments documenting that public profile reads, cross-user contact reads, organizer/sponsor/talent/judge/mentor access, and contact reveal access are all intentionally deferred to separately approved future work.
+
+No Supabase CLI command was run. No migration was applied, pushed, reset, or connected to a live database.
+
+## Policies created
+
+- `public.profiles` `select`: `using (auth.uid() = id)`
+- `public.profiles` `insert`: `with check (auth.uid() = id)`
+- `public.profiles` `update`: `using (auth.uid() = id)`, `with check (auth.uid() = id)`
+- `public.user_contacts` `select`: `using (auth.uid() = user_id)`
+- `public.user_contacts` `insert`: `with check (auth.uid() = user_id)`
+- `public.user_contacts` `update`: `using (auth.uid() = user_id)`, `with check (auth.uid() = user_id)`
+
+No policy allows public, anonymous, broad authenticated, or cross-user access to either table. No organizer, sponsor, judge, mentor, talent, or reveal policy was added.
+
+## Insert/delete choices
+
+Included `profiles` self-insert because the existing identity foundation migration does not include a signup trigger yet. This keeps profile creation possible for authenticated users while still requiring the inserted row to use their own auth user id.
+
+Delete policies were intentionally omitted for both tables. The current task did not require account deletion behavior, and deleting identity/contact rows should be handled by a separately approved account-deletion flow.
 
 ## Files touched
-- `docs/DATABASE.md` - reconciled `profiles` and `user_contacts` documentation with the approved migration.
-- `docs/RLS_ACCESS_MATRIX.md` - added a concise acknowledgment for future `user_contacts` RLS work and adjusted contact wording.
-- `docs/PRIVACY_MODEL.md` - clarified protected contact-data storage and reveal wording.
-- `handoff/CODEX_SUMMARY.md` - this handoff.
 
-`docs/PRODUCT_DECISIONS.md` was checked and did not need a change; there was no existing decision entry describing the stale inline-contact `profiles` shape.
+- `supabase/migrations/20260710130000_identity_rls.sql`
+- `handoff/CODEX_SUMMARY.md`
 
 ## Verification
-- Re-read the edited `docs/DATABASE.md` sections against `supabase/migrations/20260710120000_identity_foundation.sql`: passed.
-- Confirmed the `profiles` and `user_contacts` column lists in `docs/DATABASE.md` now match the migration exactly.
-- `npm run build`: passed.
-- `npx tsc --noEmit`: passed.
-- `npx eslint .`: passed.
-- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`: passed.
-  - `npm run build`: OK
-  - `npx tsc --noEmit`: OK
-  - `npx eslint .`: OK
-  - forbidden naming scan: OK
+
+Ran:
+
+- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
+
+Result: passed.
+
+The script reported:
+
+- `npm run build`: OK
+- `npx tsc --noEmit`: OK
+- `npx eslint .`: OK
+- forbidden identifier scan: OK
+
+I also read the drafted SQL for syntax and policy-scope sanity before handoff.
 
 ## Deviations
-- None. No SQL, migration, RLS policy, product code, or UI file appears in the diff.
-- No files outside the task's expected change list were touched.
+
+None.
 
 ## Open questions
-- None.
+
+None.
