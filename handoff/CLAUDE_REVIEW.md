@@ -1,63 +1,63 @@
-# Claude Review — PHASE3E-002
+# Claude Review — PHASE3D-002
 
 ## 1. Verdict
 
 **APPROVE**
 
-The three new tests correctly isolate each remaining fallback branch, use distinct synthetic UUIDs, correctly extend the existing cleanup pattern to cover them, and get the `plan()` count right on the first try — the exact mistake flagged for avoidance in the task itself. Every claim in `CODEX_SUMMARY.md` was independently re-verified.
+A one-statement migration that drops exactly the policy D17 marked for removal, a correctly-inverted test (not a deleted one — the behavioral proof that the trigger still works survives), and every other policy confirmed genuinely untouched, not just "not intentionally touched."
 
 ## 2. Scope containment
 
-**Held.** `git status --short` shows exactly `supabase/tests/database/identity_foundation.test.sql` (modified) plus the standard `handoff/CODEX_SUMMARY.md` write. `git status --short supabase/migrations/ docs/` returned nothing — no migration, no doc touched. I read the full diff directly rather than relying on a summary description.
+**Held.** The new migration file was untracked, so I read it directly rather than relying on `git diff --stat` (per your instruction) — confirmed via `git status --short` (`?? supabase/migrations/20260710150000_drop_temporary_profile_insert_policy.sql`) and a full direct read. Full diff is exactly: the new migration, the test file update, and the standard handoff write. `git status --short docs/` plus the three prior migration files returned nothing — no doc, no earlier migration touched.
 
-## 3. Only `supabase/tests` and handoff changed
+## 3. Exactly one new migration
 
-**Confirmed.** No RLS policy, product code, UI, script, or config file appears anywhere in the diff.
+**Confirmed.** `find supabase/migrations -type f` lists exactly four files: the three prior approved migrations, unchanged, plus this task's new `20260710150000_drop_temporary_profile_insert_policy.sql`.
 
-## 4. `raw_user_meta_data->>'name'` covered
+## 4. Only `profiles_insert_own` dropped
 
-**Confirmed, and correctly isolated.** The new test (line ~285) supplies `jsonb_build_object('name', 'Synthetic Name Fallback')` with no `full_name` key present, then asserts `profiles.full_name = 'Synthetic Name Fallback'` — this genuinely exercises the second `coalesce` branch, not just the first one with an unused extra key.
+**Confirmed by direct read.** The entire migration is two lines of comment plus one statement: `drop policy profiles_insert_own on public.profiles;`. No other `drop`/`alter`/`create` statement appears anywhere in the file.
 
-## 5. `raw_user_meta_data->>'display_name'` covered
+## 5. `profiles_select_own` / `profiles_update_own` unchanged
 
-**Confirmed, and correctly isolated.** Supplies only `display_name` (no `full_name`, no `name`), asserts the result equals it — correctly exercises the third branch specifically, since the first two are provably absent from the input.
+**Confirmed.** `git status --short` shows `supabase/migrations/20260710130000_identity_rls.sql` (where these policies live) as untouched — not even a diff to check, the file itself was never modified. This is stronger confirmation than "the diff doesn't mention them" — the source file is byte-identical to before.
 
-## 6. Placeholder `'New participant'` fallback covered
+## 6. `user_contacts` policies unchanged
 
-**Confirmed, and correctly isolated.** Supplies `jsonb_build_object('unrelated_key', 'ignored synthetic value')` — none of the three recognized keys present — and asserts `full_name = 'New participant'`. This is the right way to test a default/placeholder path: prove none of the preceding conditions can fire, not just assert the outcome.
+**Confirmed, same basis.** All three `user_contacts` policies live in the same untouched `20260710130000_identity_rls.sql` file. Nothing in the new migration references `user_contacts` at all.
 
-## 7. Original `full_name` fallback test still exists
+## 7. Signup trigger still creates `profiles` rows
 
-**Confirmed.** Read the full file directly (not just the diff): the original `PHASE3E-001` test block (insert for UUID `11111111-...`, then the three assertions "exactly one profile row," "non-null `full_name`," "`full_name` comes from auth metadata") is untouched and intact, immediately preceding the three new blocks.
+**Confirmed, behaviorally, not just assumed.** The pre-existing signup-behavior tests (profile row created, `full_name` populated correctly across all four fallback branches, no `user_contacts` row, no contact leakage) were left assertion-unchanged and re-ran successfully against the database *with* the new migration applied — I independently re-ran `npx supabase test db --local supabase/tests` myself and got the same `28/28 PASS` result. This directly proves the trigger's `security definer` execution path never depended on `profiles_insert_own` in the first place, consistent with the `PHASE3D-001` review's finding that the policy was unrelated to how the trigger authorizes its insert.
 
-## 8. Synthetic, local-only data
+## 8. Tests verify `profiles_insert_own` is absent
 
-**Confirmed.** Three new UUIDs (`22222222-...`, `33333333-...`, `44444444-...`), each distinct from each other and from the `PHASE3E-001` UUID, exactly as required. All new emails use the `.invalid` TLD, consistent with established convention. Independently grepped for JWT/key-shaped secrets: zero matches.
+**Confirmed, and correctly done as an inversion, not a deletion.** The diff shows exactly one meaningful change: `exists (...)` → `not exists (...)` on the same query, with the assertion message updated from "...policy exists for insert" to "...policy is absent for insert," and the surrounding comment updated to explain why. This is the right way to handle a test whose subject changed state — the test still proves something (the policy's absence) rather than being silently removed, which would have left a coverage gap.
 
-## 9. Cleanup / rollback safety
+## 9. `npx supabase db reset` passes
 
-**Confirmed, and correctly extended, not just left as-is.** The pre-test guard-delete blocks (for `user_contacts`, `profiles`, `auth.users`) were extended from a single `where id = '...'` to `where id in (...)` covering all four synthetic UUIDs — this matters, because leaving the old single-id guard would have meant a prior interrupted run of the *new* tests wouldn't be cleaned up before a fresh run. The entire test body, including all three new inserts, remains inside the same `begin; ... rollback;` block that was already established — confirmed by reading to the end of the file: `rollback;` is still the last statement, after `finish()`.
+**Confirmed, independently re-run.** All four migrations applied cleanly in order, including the new drop-policy migration, with no error.
 
-## 10. `plan()` count correctness
+## 10. `npx supabase test db --local supabase/tests` passes
 
-**Correct: `select plan(28);`.** Independently recounted every test-producing statement in the file by hand (not just trusting the count): 2 `has_table` + 3 `hasnt_column` + 1 `ok` (contact-shaped scan) + 3 `has_column` + 2 `ok` (RLS enabled) + 6 `ok` (policy existence) + 1 `ok` (trigger function) + 1 `ok` (trigger wiring) + 3 (original signup behavior: count, non-null, equals-metadata) + 3 (new fallback branches) + 1 (`user_contacts` count = 0) + 1 (no contact leak) + 1 (forbidden-identifier guard) = **28**, matching both the declared plan and the actual local test run result.
+**Confirmed, independently re-run.** `Files=1, Tests=28, Result: PASS` — same count as before this task (28), correctly unchanged since one test's polarity flipped rather than a test being added or removed.
 
-## 11. `npx supabase db reset` passes
-
-**Confirmed, independently re-run.** All three migrations applied cleanly; the same informational `WARN: no files matched pattern: supabase/seed.sql` appeared as in prior runs — expected, no seed file exists yet, does not affect correctness.
-
-## 12. `npx supabase test db --local supabase/tests` passes
-
-**Confirmed, independently re-run.** `Files=1, Tests=28, Result: PASS` — matches `CODEX_SUMMARY.md` and your reported result exactly.
-
-## 13. `verify.ps1` passes
+## 11. `verify.ps1` passes
 
 **Confirmed, independently re-run.** All four steps (build, typecheck, lint, forbidden-string scan) passed cleanly.
 
+## 12. No remote Supabase operation attempted
+
+**Confirmed.** Only `npx supabase db reset` and `npx supabase test db --local supabase/tests` appear in `CODEX_SUMMARY.md`'s command log, both local-only. No `db push`, `supabase link`, SQL Editor, or hosted-project reference anywhere in the diff.
+
+## 13. Forbidden identifier
+
+**Absent.** Independently grepped both the new migration file and the test file's diff for the string formed by `profile` + `_` + `id`: zero matches in either.
+
 ## 14. Fixes needed
 
-**None.** This task fully closes the `PHASE3E-001` advisory with no new gaps introduced.
+**None.** One item correctly deferred rather than done: `CODEX_SUMMARY.md` explicitly flags that `docs/RLS_ACCESS_MATRIX.md`'s `profiles INSERT` row still needs updating to reflect that the D17 tightening has now actually happened — correctly left as a follow-up rather than edited here, since this task was not granted a `/docs` exception. Recommend that doc update as the next small task.
 
 ## Summary
 
-PHASE3E-002 does exactly what a coverage-gap-closing task should: it adds precisely the three missing test cases, each correctly isolated to prove its specific branch rather than merely exercising the trigger again, extends the cleanup pattern to match the new fixtures, and gets the easy-to-get-wrong bookkeeping detail (the `plan()` count) right without a retry. All four branches of D17's `full_name` fallback chain are now behaviorally verified. Approved.
+PHASE3D-002 completes exactly the RLS-tightening half of D17 that `PHASE3D-000` deferred and `PHASE3D-001`/`PHASE3E-001`/`PHASE3E-002` set up the precondition for: one clean policy drop, zero collateral changes to any other policy, and the behavioral proof that the signup path still works carried through unchanged rather than assumed. Approved. Next recommended step: a small doc-only task to bring `RLS_ACCESS_MATRIX.md`'s `profiles INSERT` row in line with this now-completed tightening.

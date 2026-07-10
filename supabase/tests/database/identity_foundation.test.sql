@@ -76,7 +76,7 @@ select ok(
   'user_contacts has row level security enabled'
 );
 
--- Self-owned policies are the only identity-table access added by the approved RLS migration.
+-- Self-owned read/update policies remain, while the temporary profiles insert policy is removed.
 select ok(
   exists (
     select 1
@@ -92,7 +92,7 @@ select ok(
 );
 
 select ok(
-  exists (
+  not exists (
     select 1
     from pg_policy p
     join pg_class c on c.oid = p.polrelid
@@ -102,7 +102,7 @@ select ok(
       and p.polname = 'profiles_insert_own'
       and p.polcmd = 'a'
   ),
-  'profiles_insert_own policy exists for insert'
+  'profiles_insert_own policy is absent for insert'
 );
 
 select ok(
