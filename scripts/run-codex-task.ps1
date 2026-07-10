@@ -72,6 +72,12 @@ if ([string]::IsNullOrWhiteSpace($taskContent)) {
     exit 1
 }
 
+# --- Precondition: refuse to run against the "no active task" placeholder ---
+if ($taskContent.TrimStart() -match "^# NO ACTIVE TASK") {
+    Write-Host "/tasks/current-task.md is the NO ACTIVE TASK placeholder. Claude must write a real task before Codex can run." -ForegroundColor Red
+    exit 1
+}
+
 # --- Precondition: one writer at a time -- start from a clean tree ---
 # git status errors (not a repo, git missing) are treated the same as a
 # dirty tree: this check must pass, not silently skip, before Codex runs.
