@@ -5,69 +5,73 @@ Copy this shape into `/tasks/current-task.md` for every new task. Fill every sec
 ---
 
 ## Task ID
-`PHASE3B-002`
+`PHASE3C-001`
 
 ## Phase reference
-`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task is documentation-only cleanup following `PHASE3B-001`. It does not add code, schema, or RLS; it brings `/docs` back in sync with a migration that was already drafted and approved.
+`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task drafts the RLS policies for the identity foundation created in `PHASE3B-001` and documented in `PHASE3B-002`. It does not apply anything, and does not touch any table beyond `profiles`/`user_contacts`.
 
 ## Objective
-Update `/docs` so it accurately describes the approved `profiles` / `user_contacts` split from `PHASE3B-001`, instead of the older, now-stale description where contact fields lived directly on `profiles`.
+Draft (write, do not apply) one new SQL migration that enables Row Level Security on `profiles` and `user_contacts` and adds strictly self-owned policies, so both tables move from "RLS-less" to "deny-by-default with narrow, explicit self-access" — nothing broader.
 
 ## Context
-`PHASE3B-001` was reviewed and approved (`handoff/CLAUDE_REVIEW.md`, verdict APPROVE). It created `supabase/migrations/20260710120000_identity_foundation.sql`, which:
-- Creates `profiles` for identity/display data only (`full_name`, `university`, `major`, `graduation_year`, `governorate`, `city`, `bio`, `github_url`, `linkedin_url`, `portfolio_url`, `experience_level`, `primary_role`, `looking_for_team`, timestamps) — no contact fields.
-- Creates a separate `user_contacts` table (`id`, `user_id references profiles(id) on delete cascade`, `email`, `phone`, `whatsapp`, `preferred_contact_method`, timestamps) for all private contact data.
-- Adds no RLS yet (deliberately deferred to a separate, separately-approved task).
-
-That review flagged, as an explicit open item, that `/docs/DATABASE.md` still describes the old shape (contact fields inline on `profiles`) and needs reconciling in its own dedicated step. This is that step.
-
-## Important exception to the standing rule
-`AGENTS.md` and the task template both say `/docs` is read-only by default. **This task is the explicit, scoped exception** for exactly the files listed under "In scope" below — nothing else in `/docs` may be touched.
+- `PHASE3B-001` (approved): created `supabase/migrations/20260710120000_identity_foundation.sql` — `profiles` (identity/display data) and `user_contacts` (private contact data: email, phone, whatsapp, preferred_contact_method), with no RLS yet.
+- `PHASE3B-002` (approved): reconciled `/docs/DATABASE.md`, `/docs/PRIVACY_MODEL.md`, and `/docs/RLS_ACCESS_MATRIX.md` with that split. `RLS_ACCESS_MATRIX.md` currently carries a note that `user_contacts` "needs its own access-matrix row and separately approved RLS policy before implementation" — this task is that approved RLS policy work, for these two tables only.
+- No auth UI, profile form, organizations, hackathons, matching/team tables, or contact-reveal logic exist anywhere in the repo yet.
 
 ## In scope
-Documentation edits only, limited to:
-- **`/docs/DATABASE.md`** — update the `profiles` section to remove contact fields (`phone`, and any other contact-field mentions) and to match the columns actually created in the migration; add a `user_contacts` section describing it as private (P3) contact data, its columns, and its `user_id → profiles(id) on delete cascade` relationship. Add a short note that this shape was corrected in `PHASE3B-001` (with a pointer to the migration filename) so the history is traceable, not silently rewritten.
-- **`/docs/RLS_ACCESS_MATRIX.md`** — only where needed to acknowledge `user_contacts` as a private-contact-data table that will need its own RLS row once RLS is approved (do not draft the actual policy — this is a documentation acknowledgment only, since no RLS exists yet).
-- **`/docs/PRIVACY_MODEL.md`** — only where needed so its description of contact data storage matches the new split (e.g. wherever it currently implies contact fields live on `profiles`).
-- **`/docs/PRODUCT_DECISIONS.md`** — only if an existing decision entry (e.g. one describing the original `profiles` shape) needs a clarifying note; do not invent a new numbered decision unless one doesn't already exist to amend, and if you do add one, keep it short and clearly mark it as amending/superseding, not contradicting silently.
-- Keep every edit concise — this is a reconciliation pass, not a rewrite. Preserve existing document structure, tone, and section numbering; change only what's factually wrong now.
+- Create exactly one new SQL migration file under `supabase/migrations/`, named with a later timestamp prefix than `20260710120000_identity_foundation.sql` (e.g. `supabase/migrations/20260710130000_identity_rls.sql` or similar — pick a reasonable, later timestamp).
+- `alter table public.profiles enable row level security;`
+- `alter table public.user_contacts enable row level security;`
+- Policies on `profiles`, all scoped to `auth.uid() = id` (the sole naming-rule exception column):
+  - `select` — a user may read their own profile row.
+  - `insert` — a user may insert their own profile row (`with check (auth.uid() = id)`), if you judge this is needed given a signup trigger may not exist yet; use your judgment and explain the choice in the handoff.
+  - `update` — a user may update their own profile row.
+  - No `delete` policy unless you have a specific, stated reason — if omitted, say so explicitly in the handoff rather than leaving it unaddressed.
+- Policies on `user_contacts`, all scoped to `auth.uid() = user_id`:
+  - `select` — a user may read their own contact row.
+  - `insert` — a user may insert their own contact row (`with check (auth.uid() = user_id)`).
+  - `update` — a user may update their own contact row.
+  - Same note on `delete` as above.
+- SQL comments explaining the privacy stance: no public read on `profiles` yet, no cross-user read on `user_contacts` ever via these policies, no organizer/sponsor/talent access yet — those are explicitly future, separately-approved work (a dedicated safe view/RPC for public-safe profile reads, and an audited RPC for contact reveal — neither implemented here).
 
 ## Out of scope
-- Any SQL file, migration, or schema change of any kind.
-- Any RLS policy (drafted or applied).
-- Any product code under `src/`.
-- Any UI/UX change.
-- Any Supabase connection or live database operation.
-- Any change to `AGENTS.md`, `CLAUDE.md`, `WORKFLOW.md`, `tasks/TASK_TEMPLATE.md`, or `scripts/*.ps1` — the Claude/Codex workflow itself is not part of this task.
-- Any `/docs` file not explicitly named in "In scope" above (e.g. `ARCHITECTURE.md`, `ROUTES.md`, `COMPONENTS.md`, `PHASES.md`, `RISKS.md` should not be touched unless you discover a factual contact-field error in one of them specifically caused by this same stale-shape issue — if so, stop and flag it in the handoff rather than editing it silently).
+- Applying, pushing, or resetting this or any migration (`supabase db push`, `supabase migration up`, `supabase db reset`, or any equivalent) — draft only.
+- Any connection to a live Supabase project or database.
+- Any RLS policy or table other than `profiles` and `user_contacts` — no `organizations`, `organization_members`, `hackathons`, `hackathon_tracks`, `hackathon_applications`, matching/team tables, or anything else.
+- Any public/anonymous read policy on either table.
+- Any cross-user read policy on `user_contacts` (no organizer, sponsor, judge, mentor, or "reveal" access — that is explicitly deferred to a future, separately-approved RPC-based mechanism, not a table policy).
+- Any broad `authenticated`-role read policy on `user_contacts` (e.g. `using (true)` for any authenticated user) — self-owned only.
+- Any auth UI, login/signup flow, session handling, or profile form.
+- Any contact-reveal function, RPC, or view.
+- Any sponsor/talent access logic.
+- Any edit to `/docs`, `AGENTS.md`, `CLAUDE.md`, `WORKFLOW.md`, or `scripts/*.ps1`.
+- Any product UI change.
+- Any file outside `supabase/migrations/` plus the standard `handoff/CODEX_SUMMARY.md` write.
 
 ## Relevant docs
-- `/docs/DATABASE.md` §1 (`profiles`) — the section to correct.
-- `supabase/migrations/20260710120000_identity_foundation.sql` — the actual approved schema; treat this file as the source of truth for what the docs should say, not the other way around.
-- `handoff/CLAUDE_REVIEW.md` (the `PHASE3B-001` review) — background on why the split was made and what was explicitly flagged as needing reconciliation.
-- `/docs/PRIVACY_MODEL.md` §1 and §4 — data classification and contact-reveal mechanism sections likely to reference contact data location.
-- `/docs/RLS_ACCESS_MATRIX.md` — table-group rows that will need a `user_contacts` acknowledgment.
+- `/docs/RLS_ACCESS_MATRIX.md` — `profiles` row (identity table) and the `user_contacts` acknowledgment note added in `PHASE3B-002`; this task should make the actual policies consistent with what that matrix already describes (self-only access, no public/cross-user reads).
+- `/docs/DATABASE.md` §1 — `profiles` and `user_contacts` column definitions and ownership statements this task's policies must match.
+- `/docs/PRIVACY_MODEL.md` §1 and §4 — P3 classification and the stated future reveal mechanism (`get_revealed_contacts` RPC) that this task must not attempt to implement, only leave room for.
+- `supabase/migrations/20260710120000_identity_foundation.sql` — the table shapes these policies apply to; treat it as the source of truth for column names.
 
 ## Approvals on record
-- [ ] Database migration approved by human — not applicable, no migration in this task.
-- [ ] RLS / contact-reveal logic approved by human — not applicable, no RLS or reveal logic in this task; `RLS_ACCESS_MATRIX.md` may only be updated to *acknowledge* the new table exists, not to add an actual policy.
+- [x] Database migration approved by human — **approved to draft an RLS migration file only.** Explicitly stated in this task by the human: "This task is approved to draft an RLS migration file only. It is NOT approved to apply, push, reset, or run the migration."
+- [x] RLS / contact-reveal logic approved by human — **approved, narrowly.** Explicitly stated: self-owned RLS policies on `profiles` and `user_contacts` only, drafted (not applied), not connected to a live database. This approval does **not** extend to contact-reveal logic, organizer/sponsor/talent access, or any table beyond these two — those remain unapproved.
 
 ## Files expected to change
-- `/docs/DATABASE.md`
-- `/docs/RLS_ACCESS_MATRIX.md` (only if needed)
-- `/docs/PRIVACY_MODEL.md` (only if needed)
-- `/docs/PRODUCT_DECISIONS.md` (only if needed)
+- One new file under `supabase/migrations/` (e.g. `supabase/migrations/20260710130000_identity_rls.sql`)
 - `handoff/CODEX_SUMMARY.md` (standard handoff write)
 
-If the diff touches any file outside this list, that is a deviation to flag, not a silent addition.
+If the diff touches anything else, that is a deviation to flag, not a silent addition.
 
 ## Acceptance criteria
-- [ ] `/docs/DATABASE.md` no longer implies `email`/`phone`/`whatsapp` fields live on `profiles`.
-- [ ] `/docs/DATABASE.md` clearly describes `user_contacts` as private (P3) contact data, with its columns and its `user_id → profiles(id)` relationship.
-- [ ] A short note exists (in `DATABASE.md` or `PRODUCT_DECISIONS.md`) that `PHASE3B-001` intentionally changed the earlier `profiles` shape, pointing at the migration file.
-- [ ] The naming rule is preserved everywhere touched: `profiles.id` is the only exception to `user_id`.
+- [ ] Exactly one new SQL migration file is created under `supabase/migrations/`.
+- [ ] `alter table ... enable row level security` is present for both `profiles` and `user_contacts`.
+- [ ] Every policy on both tables is scoped to the authenticated owner only (`auth.uid() = id` for `profiles`, `auth.uid() = user_id` for `user_contacts`) — no public, anonymous, or broad-authenticated policy of any kind.
+- [ ] No policy grants any user read access to another user's `profiles` or `user_contacts` row.
+- [ ] No organizer, sponsor, judge, mentor, or "reveal" policy is added.
+- [ ] No Supabase CLI command or live database connection is attempted anywhere in this task.
 - [ ] No forbidden identifier (the string formed by `profile` + `_` + `id`) appears anywhere in the diff.
-- [ ] No SQL, RLS policy, product code, or UI change appears anywhere in the diff.
 - [ ] `npm run build` passes.
 - [ ] `npx tsc --noEmit` passes.
 - [ ] `npx eslint .` passes.
@@ -79,19 +83,20 @@ If the diff touches any file outside this list, that is a deviation to flag, not
 - No public marketplace, no public people browsing, no public contact reveal.
 - No AI winner selection, no public negative scoring.
 - No sponsor access to raw participant data without explicit opt-in.
-- No new dependencies — this task is documentation-only, no `package.json` change of any kind.
-- `/docs` is read-only **except** for the specific files and edits authorized under "In scope" above — this is the explicit, scoped exception this task grants.
+- No new dependencies — this task is SQL-only, no `package.json` change of any kind.
+- `/docs` is read-only for this task — no exception granted here.
 - Do not weaken, remove, or bypass any workflow guard in `scripts/verify.ps1` or `scripts/run-codex-task.ps1`, and do not touch those files at all in this task.
 
 ## Verification steps
-1. `npm run build`
-2. `npx tsc --noEmit`
-3. `npx eslint .`
-4. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
-5. Re-read the edited sections of `/docs/DATABASE.md` side by side with `supabase/migrations/20260710120000_identity_foundation.sql` to confirm they now match column-for-column.
+1. Read the drafted SQL yourself for syntactic sanity and policy-scope correctness (there is no live database to run it against in this task).
+2. `npm run build`
+3. `npx tsc --noEmit`
+4. `npx eslint .`
+5. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
 
 ## Handoff notes expected
-- List exactly which `/docs` files were changed and, for each, a one-line summary of what changed.
-- Confirm explicitly that no SQL, RLS, product code, or UI file appears in the diff.
-- Confirm explicitly that the `profiles`/`user_contacts` column lists in `DATABASE.md` now match the migration file exactly.
-- If `RLS_ACCESS_MATRIX.md`, `PRIVACY_MODEL.md`, or `PRODUCT_DECISIONS.md` needed no changes, say so explicitly rather than leaving it ambiguous whether they were checked.
+- List every policy created, per table, in one line each (table, operation, `using`/`with check` expression).
+- Confirm explicitly that no policy allows cross-user or public/anonymous access to either table.
+- State explicitly whether `delete` policies were included or intentionally omitted, and why.
+- State explicitly which choice was made for `profiles insert` (self-insert policy vs. relying solely on a future signup trigger) and the reasoning, so a human can confirm it before any auth-flow task depends on it.
+- Confirm explicitly that no live Supabase command or connection was attempted.
