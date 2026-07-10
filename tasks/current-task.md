@@ -5,78 +5,82 @@ Copy this shape into `/tasks/current-task.md` for every new task. Fill every sec
 ---
 
 ## Task ID
-`PHASE3D-001`
+`PHASE3E-001`
 
 ## Phase reference
-`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task drafts the signup trigger decided in `PHASE3D-000` (`docs/PRODUCT_DECISIONS.md` D17). It does not apply anything, does not touch RLS, and does not touch `user_contacts`.
+`/docs/PHASES.md` Phase 3 ("Auth, profiles, organizations") — this task adds database tests proving the already-approved identity foundation (`PHASE3B-001`, `PHASE3C-001`, `PHASE3D-001`) behaves as designed. It does not add or change any migration or product feature.
 
 ## Objective
-Draft (write, do not apply) one new SQL migration that creates a trigger function and an `AFTER INSERT` trigger on `auth.users`, so that a minimal `public.profiles` row is created automatically for every new signup, exactly as decided in D17 — `full_name` from an auth-metadata fallback chain or a placeholder, `user_contacts` untouched, no contact data anywhere near `profiles`.
+Add committed pgTAP-style database tests under `supabase/tests/` that verify, against a **local** Supabase instance only, that `profiles`, `user_contacts`, their RLS policies, and the signup trigger behave exactly as the three approved identity migrations intend.
 
 ## Context
-- `PHASE3B-001` (approved): created `profiles` (identity/display data, `full_name text not null`) and `user_contacts` (private contact data), no RLS.
-- `PHASE3C-001` (approved): added self-owned RLS on both tables, including a `profiles_insert_own` policy explicitly described as temporary scaffolding.
-- `PHASE3D-000` (approved, documentation-only): decided the identity creation strategy — D17 in `docs/PRODUCT_DECISIONS.md`. This task implements exactly the trigger half of that decision. The RLS-tightening half (removing/adjusting `profiles_insert_own` once this trigger exists) is explicitly **not** part of this task — it requires its own separately approved RLS migration later.
+- `PHASE3B-001` (approved): `20260710120000_identity_foundation.sql` — `profiles` (identity/display) and `user_contacts` (private contact data), separated.
+- `PHASE3C-001` (approved): `20260710130000_identity_rls.sql` — self-owned RLS on both tables.
+- `PHASE3D-001` (approved): `20260710140000_signup_profile_trigger.sql` — `auth.users` signup trigger creates a minimal `profiles` row (id + `full_name` fallback chain), never touches `user_contacts`, never copies contact data.
+- The human has already initialized local Supabase and run `npx supabase db reset` successfully, applying all three migrations above to the **local** instance. `npx supabase test db --help` confirms the local CLI's pgTAP test runner is available.
+- This is the first task in the project authorized to run a local database operation. That authorization is narrow and explicit — see "Local vs. remote — read carefully" below.
+
+## Local vs. remote — read carefully
+This task authorizes exactly two commands, **against the local Supabase instance only**:
+- `npx supabase db reset` (to get a clean local database matching the three approved migrations, so tests run against a known state)
+- `npx supabase test db --local supabase/tests` (to run the tests you write)
+
+Nothing else. No remote project connection, no `npx supabase db push`, no `npx supabase link`, no Supabase Studio/SQL Editor, no use of any `SUPABASE_SERVICE_ROLE_KEY`/URL pointing at a hosted project. If at any point running these commands seems to require or trigger a remote connection, stop and report it in the handoff rather than proceeding.
 
 ## In scope
-- Create exactly one new SQL migration file under `supabase/migrations/`, timestamped later than `20260710130000_identity_rls.sql` (e.g. `supabase/migrations/20260710140000_signup_profile_trigger.sql` or similar reasonable later timestamp).
-- Create (or `create or replace`) a trigger function that:
-  - Runs on `auth.users` `after insert`, `for each row`.
-  - Inserts one row into `public.profiles` with `id = new.id`.
-  - Populates `full_name` using this exact fallback chain, in order:
-    1. `new.raw_user_meta_data->>'full_name'`
-    2. `new.raw_user_meta_data->>'name'`
-    3. `new.raw_user_meta_data->>'display_name'`
-    4. the literal placeholder `'New participant'`
-  - Leaves every other `profiles` column at its column default / `null` (no attempt to populate `university`, `bio`, etc. — onboarding's job, not the trigger's).
-  - Does **not** insert or reference `public.user_contacts` in any way.
-  - Does **not** read or copy `new.email` or any other `auth.users` contact-shaped field into `profiles`.
-  - Is reasonably idempotent/safe against being invoked more than once for the same user id — e.g. `on conflict (id) do nothing` on the `profiles` insert, or an equivalent guard. Use your judgment on the exact mechanism and explain the choice in the handoff.
-- Create the `after insert on auth.users` trigger itself, wired to the function above.
-- Use `security definer` **only if you determine it's actually needed** for the function to successfully insert into `public.profiles` from a trigger context — if you use it, the function **must** set `search_path` explicitly (e.g. `set search_path = public, pg_temp`) as a `create function ... set search_path = ...` clause or equivalent. If you judge `security definer` is not needed, say so explicitly in the handoff and explain why.
-- SQL comments explaining: (a) why `user_contacts` is deliberately not created here (per D17, that's onboarding's responsibility), and (b) that contact data (email, phone, whatsapp) must never be copied into `profiles` by this or any future version of this trigger.
+- Create one or more pgTAP-style SQL test files under `supabase/tests/` (e.g. `supabase/tests/database/identity_foundation.test.sql`, or split into a few focused files — your judgment, explain the structure in the handoff), compatible with `npx supabase test db --local supabase/tests`.
+- Tests should cover, at minimum:
+  1. `profiles` table exists (in `public` schema).
+  2. `user_contacts` table exists (in `public` schema).
+  3. `profiles` does **not** have `email`, `phone`, or `whatsapp` columns (or any other contact-shaped column).
+  4. `user_contacts` **does** have `email`, `phone`, and `whatsapp` columns.
+  5. Row Level Security is enabled on `profiles`.
+  6. Row Level Security is enabled on `user_contacts`.
+  7. The signup trigger function (`public.create_profile_for_new_user`, or whatever it is actually named in `20260710140000_signup_profile_trigger.sql` — read the file, don't assume) exists.
+  8. The `auth.users` trigger itself exists and is wired to that function.
+  9. Behaviorally: inserting a synthetic row into `auth.users` (see "Testing expectations" below) results in exactly one new `profiles` row with `id` matching the inserted user and a non-null `full_name`.
+  10. Behaviorally: that same insert does **not** create any row in `user_contacts`.
+  11. Behaviorally: no email/phone/whatsapp value from the synthetic `auth.users` row appears anywhere in the resulting `profiles` row.
+- Add a concise comment above each test (or test group) explaining what it verifies and why it matters (e.g. "contact data must never leak into profiles — see PRIVACY_MODEL.md").
+- Where practical, include a check that no database object name created by the identity migrations contains the forbidden identifier (the string formed by `profile` + `_` + `id`) — e.g. by inspecting `information_schema`/`pg_catalog` object names relevant to these tables/functions/triggers. If this is impractical to express cleanly in pgTAP, say so in the handoff instead of forcing it.
+- Run `npx supabase db reset` locally to get a clean baseline, then run `npx supabase test db --local supabase/tests` and iterate until it passes.
 
 ## Out of scope
-- Applying, pushing, or resetting this or any migration (`supabase db push`, `supabase migration up`, `supabase db reset`, or any equivalent) — draft only.
-- Any connection to a live Supabase project or database.
-- Any RLS policy — no new policy, no modification to `profiles_insert_own`, `profiles_select_own`, `profiles_update_own`, or any `user_contacts` policy from `PHASE3C-001`. That tightening is explicitly deferred to a future, separately-approved task per D17.
-- Any insert, reference, or write to `public.user_contacts` from this trigger.
-- Any copying of `email`, `phone`, `whatsapp`, or any other contact-shaped value into `profiles`, from `auth.users` or anywhere else — `full_name` from the metadata fallback chain is the only value this trigger populates beyond `id`.
-- Any auth UI, login/signup form, or onboarding flow.
-- Any product UI change.
+- Any new or modified migration file — the schema/RLS/trigger are already approved and frozen for this task; if a test reveals a real defect in them, stop and report it rather than editing `supabase/migrations/`.
+- Any remote Supabase connection, `db push`, `supabase link`, or SQL Editor use of any kind.
+- Any auth UI, login/signup form, onboarding flow, or product UI change.
 - `organizations`, `hackathons`, matching/team tables, contact-reveal logic, or sponsor/talent access of any kind.
+- Any real user data — all `auth.users`/`profiles`/`user_contacts` rows used in tests must be obviously synthetic (test emails, placeholder names), never anything resembling a real person.
+- Any secret, real API key, or real Supabase project URL/credential committed anywhere.
 - Any edit to `/docs`, `AGENTS.md`, `CLAUDE.md`, `WORKFLOW.md`, or `scripts/*.ps1`.
-- Any file outside `supabase/migrations/` plus the standard `handoff/CODEX_SUMMARY.md` write.
+- Any file outside `supabase/tests/` plus the standard `handoff/CODEX_SUMMARY.md` write (and the two authorized local CLI runs, which don't produce committed files beyond your test files).
 
 ## Relevant docs
-- `docs/PRODUCT_DECISIONS.md` D17 — the decision this task implements; treat its wording as binding for the fallback chain, the "no `user_contacts`" rule, and the "temporary scaffolding" framing of the existing insert policy.
-- `docs/DATABASE.md` §1 (`profiles`) and §13 data flow #1 ("Signup") — the trigger behavior these already describe; this migration should make that description true rather than contradict it.
-- `docs/RLS_ACCESS_MATRIX.md` — `profiles INSERT` row, which already anticipates this trigger as the "D17 target"; this task does not need to edit it (that row already accounts for this migration existing eventually), but should not implement anything inconsistent with what it says.
-- `supabase/migrations/20260710120000_identity_foundation.sql` — exact `profiles` column shapes/constraints (including `full_name text not null`) this trigger's insert must satisfy.
-- `supabase/migrations/20260710130000_identity_rls.sql` — the existing self-owned RLS this trigger will coexist with (not modify).
+- `docs/DATABASE.md` §1 (`profiles`, `user_contacts`) — column shapes and privacy levels the tests must verify against.
+- `docs/PRIVACY_MODEL.md` §1 — why contact-data separation is load-bearing, not incidental, for these tests.
+- `docs/RLS_ACCESS_MATRIX.md` — `profiles`/`user_contacts` rows, for what "RLS enabled, self-owned only" should mean in test form.
+- `docs/PRODUCT_DECISIONS.md` D17 — the signup trigger's intended behavior (fallback chain, no `user_contacts` creation) that the behavioral tests must confirm.
+- `supabase/migrations/20260710120000_identity_foundation.sql`, `20260710130000_identity_rls.sql`, `20260710140000_signup_profile_trigger.sql` — read these directly for exact table/column/function/trigger names; do not guess or assume names not confirmed by reading the files.
 
 ## Approvals on record
-- [x] Database migration approved by human — **approved to draft a migration file only.** Explicitly stated in this task: "This task is approved to draft a migration file only. It is NOT approved to apply, push, reset, or run the migration."
-- [ ] RLS / contact-reveal logic approved by human — **not approved and not needed.** This task does not touch any RLS policy.
+- [x] Database migration approved by human — **not applicable; no new migration in this task.** The three existing migrations remain frozen and unmodified.
+- [x] Local-only database operations approved by human — **explicitly approved, narrowly.** The human has already run `npx supabase db reset` locally and confirmed `npx supabase test db --help` is available. This task is authorized to run `npx supabase db reset` and `npx supabase test db --local supabase/tests` against the **local** instance only. Remote connection, `db push`, `supabase link`, and SQL Editor use remain unapproved and forbidden.
+- [ ] RLS / contact-reveal logic approved by human — not applicable; no RLS policy is created or modified in this task, only tested.
 
 ## Files expected to change
-- One new file under `supabase/migrations/` (e.g. `supabase/migrations/20260710140000_signup_profile_trigger.sql`)
+- One or more new files under `supabase/tests/` (e.g. `supabase/tests/database/identity_foundation.test.sql`)
 - `handoff/CODEX_SUMMARY.md` (standard handoff write)
 
 If the diff touches anything else, that is a deviation to flag, not a silent addition.
 
 ## Acceptance criteria
-- [ ] Exactly one new SQL migration file is created under `supabase/migrations/`.
-- [ ] The trigger function inserts into `public.profiles` with `id = new.id` (from `auth.users`).
-- [ ] The `full_name` fallback chain matches exactly: `raw_user_meta_data->>'full_name'` → `raw_user_meta_data->>'name'` → `raw_user_meta_data->>'display_name'` → `'New participant'`.
-- [ ] `email` is never used as or copied into `full_name` or any other `profiles` column.
-- [ ] The trigger does not insert into, reference, or otherwise touch `public.user_contacts`.
-- [ ] No phone/email/whatsapp/contact-shaped value is copied into `profiles` anywhere in the migration.
-- [ ] If `security definer` is used, the function has an explicit `search_path` setting; if not used, the handoff explains why it wasn't needed.
-- [ ] No RLS policy is created, dropped, or modified anywhere in the migration.
-- [ ] No Supabase CLI command or live database connection is attempted anywhere in this task.
+- [ ] Test file(s) exist under `supabase/tests/`, focused only on identity-foundation behavior (tables, RLS enablement, trigger existence and behavior) — nothing else.
+- [ ] `npx supabase db reset` passes (local).
+- [ ] `npx supabase test db --local supabase/tests` passes (local).
+- [ ] No migration file was created or modified.
+- [ ] No remote Supabase connection, `db push`, `supabase link`, or SQL Editor use occurred anywhere in this task.
+- [ ] No real user data or real secret/credential appears anywhere in the diff.
 - [ ] No forbidden identifier (the string formed by `profile` + `_` + `id`) appears anywhere in the diff.
-- [ ] The migration is syntactically reasonable PostgreSQL/Supabase SQL (no live database to test against in this task — manual read for sanity).
 - [ ] `npm run build` passes.
 - [ ] `npx tsc --noEmit` passes.
 - [ ] `npx eslint .` passes.
@@ -88,20 +92,27 @@ If the diff touches anything else, that is a deviation to flag, not a silent add
 - No public marketplace, no public people browsing, no public contact reveal.
 - No AI winner selection, no public negative scoring.
 - No sponsor access to raw participant data without explicit opt-in.
-- No new dependencies — this task is SQL-only, no `package.json` change of any kind.
+- No new dependencies — this task is SQL test files only, no `package.json` change of any kind.
 - `/docs` is read-only for this task — no exception granted here.
 - Do not weaken, remove, or bypass any workflow guard in `scripts/verify.ps1` or `scripts/run-codex-task.ps1`, and do not touch those files at all in this task.
 
+## Testing expectations
+- Tests must be safe to run repeatedly against a locally reset database — no dependence on state left over from a prior run.
+- Synthetic `auth.users` rows inserted for behavioral tests must use obviously fake data (e.g. `test-signup-001@example.invalid`-style addresses, clearly placeholder names) and should be cleaned up after the test (explicit `delete`/rollback) or scoped inside a transaction that's rolled back, whichever fits the pgTAP pattern you use — explain your choice in the handoff.
+- Tests must not depend on any remote Supabase state or network access — local only, as stated above.
+
 ## Verification steps
-1. Read the drafted SQL yourself for syntactic sanity and correctness against D17's exact fallback chain (there is no live database to run it against in this task).
-2. `npm run build`
-3. `npx tsc --noEmit`
-4. `npx eslint .`
-5. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
+1. `npx supabase db reset` (local)
+2. `npx supabase test db --local supabase/tests` (local)
+3. `npm run build`
+4. `npx tsc --noEmit`
+5. `npx eslint .`
+6. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
 
 ## Handoff notes expected
-- Confirm explicitly, in the summary itself, the exact fallback chain implemented and that it matches D17's order.
-- Confirm explicitly that `user_contacts` is untouched by this trigger and that no contact-shaped field was copied into `profiles`.
-- State explicitly whether `security definer` was used and why (or why not), and if used, quote the exact `search_path` setting applied.
-- State explicitly what idempotency/safety mechanism was used for the insert (e.g. `on conflict do nothing`) and why that choice was made.
-- Flag anything that felt like it required touching RLS to make the trigger work correctly — if so, stop and report rather than modifying a policy, since RLS changes are out of scope for this task.
+- List every test added, one line each, stating what it verifies.
+- Confirm explicitly that all eleven behaviors listed under "In scope" are covered, or explain precisely which are not and why.
+- State explicitly how synthetic test data is cleaned up (rollback vs. explicit delete) and confirm no real data was used.
+- Confirm explicitly that only local Supabase commands were run, and quote the exact commands used.
+- If the forbidden-identifier object-name check (item under "In scope") was impractical to express, say so explicitly rather than silently omitting it.
+- Flag immediately, rather than working around, anything that seemed to require a migration change, an RLS change, or a remote connection to make a test pass.
