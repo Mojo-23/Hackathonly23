@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.5rem;
+
+  --paper: #faf9f6;
+  --paper-raised: #ffffff;
+  --ink: #16150f;
+  --ink-muted: #5c5a4f;
+  --ink-subtle: #8b8878;
+  --border: #e4e1d6;
+  --border-strong: #cdc9b8;
+
+  --accent: #b6551a;
+  --accent-foreground: #fdf6ee;
+  --accent-soft: #f5e3d3;
+
+  --status-pending-bg: #f5efd9;
+  --status-pending-fg: #7a6417;
+  --status-success-bg: #dcefdf;
+  --status-success-fg: #1f6b3a;
+  --status-danger-bg: #f6dfda;
+  --status-danger-fg: #9c3323;
+  --status-info-bg: #dde7f5;
+  --status-info-fg: #29538f;
+  --status-neutral-bg: #e9e7dd;
+  --status-neutral-fg: #57543f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b0b0a;
+    --paper-raised: #131311;
+    --ink: #f2f0e8;
+    --ink-muted: #ada998;
+    --ink-subtle: #7d7a6c;
+    --border: #262420;
+    --border-strong: #37342c;
+
+    --accent: #e08a3e;
+    --accent-foreground: #191204;
+    --accent-soft: #3a2716;
+
+    --status-pending-bg: #3a3316;
+    --status-pending-fg: #e8d27f;
+    --status-success-bg: #163420;
+    --status-success-fg: #7bd39a;
+    --status-danger-bg: #3a1e18;
+    --status-danger-fg: #e79684;
+    --status-info-bg: #182a3f;
+    --status-info-fg: #8fb4e3;
+    --status-neutral-bg: #232019;
+    --status-neutral-fg: #b8b4a3;
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 0.25rem);
+  --radius-xl: calc(var(--radius) + 0.5rem);
+
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-fg: var(--status-pending-fg);
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-fg: var(--status-success-fg);
+  --color-status-danger-bg: var(--status-danger-bg);
+  --color-status-danger-fg: var(--status-danger-fg);
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-fg: var(--status-info-fg);
+  --color-status-neutral-bg: var(--status-neutral-bg);
+  --color-status-neutral-fg: var(--status-neutral-fg);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
