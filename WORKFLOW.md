@@ -20,7 +20,7 @@ This describes how work actually moves through this repo. Read this if you're th
    No adjacent scope, no "while I'm here" fixes, no speculative future-phase work.
 
 4. **Codex runs verification.**
-   `powershell -File scripts/verify.ps1` — build, typecheck, lint, and a scan for the forbidden `profile_id` string. Failures get fixed or honestly reported, not hidden.
+   `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` — build, typecheck, lint, and a scan for the forbidden `profile_id` string. Failures get fixed or honestly reported, not hidden.
 
 5. **Codex writes `/handoff/CODEX_SUMMARY.md`.**
    What changed, files touched, verification results, any deviations from the task and why, open questions.

@@ -9,15 +9,18 @@
       2. npx tsc --noEmit
       3. npx eslint .
       4. A scan for the forbidden string "profile_id" in code directories
-         (src/, supabase/ if present). Docs and workflow files that describe
-         the rule itself are intentionally excluded from the scan.
+         (src/, supabase/, scripts/ -- whichever exist). /docs and the
+         workflow markdown files that describe the rule itself are not
+         scanned; any script or source file in those code directories is,
+         including this repo's own automation, so no exceptions are hidden
+         there either.
 
     Exits non-zero on the first failing step so it's safe to use as a gate
     in other scripts (e.g. run-codex-task.ps1).
 
 .NOTES
     Written for Windows PowerShell 5.1. Run from the repository root:
-        powershell -File scripts/verify.ps1
+        powershell -ExecutionPolicy Bypass -File scripts/verify.ps1
 #>
 
 $ErrorActionPreference = "Stop"

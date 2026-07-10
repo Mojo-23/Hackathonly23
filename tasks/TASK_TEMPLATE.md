@@ -47,7 +47,7 @@ Concrete, checkable conditions. Prefer "renders X", "returns Y", "table has colu
 - `/docs` is read-only unless this task says otherwise.
 
 ## Verification steps
-What Codex must run before writing the handoff (default: `powershell -File scripts/verify.ps1`; add task-specific checks here if needed, e.g. "manually hit `/events/[slug]` and confirm the new section renders").
+What Codex must run before writing the handoff (default: `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`; add task-specific checks here if needed, e.g. "manually hit `/events/[slug]` and confirm the new section renders").
 
 ## Handoff notes expected
 Anything specific Claude should look for in review beyond the standard `CODEX_SUMMARY.md` shape — e.g. "flag if the scoring weights felt arbitrary" or "note any RLS policy you were tempted to add but didn't."

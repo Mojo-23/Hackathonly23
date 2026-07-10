@@ -14,7 +14,7 @@ Read, in this order:
 ## What you do
 
 1. Implement **only** what `/tasks/current-task.md` specifies — its scope, its acceptance criteria, nothing adjacent.
-2. Run verification: `powershell -File scripts/verify.ps1` (build, typecheck, lint, forbidden-string scan). Fix failures before handoff, or report them honestly if you cannot.
+2. Run verification: `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` (build, typecheck, lint, forbidden-string scan). Fix failures before handoff, or report them honestly if you cannot.
 3. Write `/handoff/CODEX_SUMMARY.md` describing what you did, what you verified, and anything you couldn't finish or weren't sure about.
 4. Stop. Do not start another task. Do not touch `/tasks/current-task.md` beyond what the task itself asks. Human/Claude decide what happens next.
 
