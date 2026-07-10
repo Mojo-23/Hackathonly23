@@ -1,60 +1,66 @@
-# Claude Review — PHASE3A-001
+# Claude Review — PHASE3B-001
 
 ## 1. Verdict
 
 **APPROVE**
 
-Codex's deliverable matches the task's scope, acceptance criteria, and every hard constraint. One legitimate, correctly-justified deviation (`.gitignore`) is noted below and is approved as part of this review rather than sent back for rework. Independent re-verification (not just trusting `CODEX_SUMMARY.md`) confirms the build/typecheck/lint/forbidden-string gates all pass and the admin client is genuinely unreachable from client code.
+The migration is clean, correctly separates identity from contact data, stays entirely within the draft-only approval boundary, and every acceptance criterion is independently verified true — not just trusted from `CODEX_SUMMARY.md`. One forward-looking design note is flagged below for the *next* task (the signup trigger), not as a defect in this one.
 
 ## 2. Scope containment
 
-**Held.** Diff touches exactly: `package.json`, `package-lock.json`, `.gitignore`, `.env.example`, `src/lib/env.ts`, `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/admin.ts`, and the standard `handoff/CODEX_SUMMARY.md` write. No `/docs`, no `AGENTS.md`/`CLAUDE.md`, no `scripts/*.ps1`, no auth UI, no profile UI, no `supabase/migrations`, no page/layout/component behavior change (confirmed independently: `npm run build`'s route table is identical to before this task — no new routes, same static/dynamic split). Codex explicitly did not wire these clients into any page, exactly as the task required ("must not be called anywhere yet").
+**Held.** Diff is exactly `supabase/migrations/20260710120000_identity_foundation.sql` plus the standard `handoff/CODEX_SUMMARY.md` write — confirmed via `git status --short`. No `/docs`, no `AGENTS.md`/`CLAUDE.md`/`WORKFLOW.md`, no `scripts/*.ps1`, no auth UI, no profile form, no organizations/hackathons/matching tables, no contact-reveal logic. Codex also correctly declined to "fix" the now-stale `DATABASE.md` contact-field description, exactly as instructed, and surfaced it as an open question for a human/Claude to reconcile separately instead of guessing.
 
-## 3. `package.json` changes
+## 3. One migration file only
 
-**Approved deps only.** `dependencies` gained exactly `@supabase/ssr` (`^0.12.0`) and `@supabase/supabase-js` (`^2.110.2`) — nothing else added, nothing existing removed or bumped. `package-lock.json`'s ~120 added lines are the transitive tree of those two packages (`@supabase/auth-js`, `functions-js`, `postgrest-js`, `realtime-js`, `storage-js`, plus `cookie`, `phoenix`, `iceberg-js`) — checked each entry resolves to a real `registry.npmjs.org` tarball with an integrity hash, consistent with an ordinary `npm install`, not hand-edited.
+**Confirmed.** `find supabase -type f` returns exactly one file: `supabase/migrations/20260710120000_identity_foundation.sql`.
 
-## 4. `.gitignore` changes
+## 4. `profiles` / `user_contacts` separation
 
-**Appropriate, and correctly flagged as a deviation rather than silently done.** The two added lines (`!.env.example`, `!.env.local.example`) only *un-ignore* the example files — the blanket `.env*` ignore rule for real env files is untouched. Without this, `.env.example` would exist locally but never be committable, defeating the task's own requirement to create it. This is exactly the kind of small, necessary, honestly-reported deviation the workflow is supposed to tolerate — Codex named it, explained why, and kept the change to the minimum needed.
+**Correct.** `profiles` holds only identity/display columns (`full_name`, `university`, `major`, `graduation_year`, `governorate`, `city`, `bio`, `github_url`, `linkedin_url`, `portfolio_url`, `experience_level`, `primary_role`, `looking_for_team`, timestamps). `user_contacts` is a distinct table keyed by `user_id`, holding `email`, `phone`, `whatsapp`, `preferred_contact_method`. This is exactly the architecture correction the task specified.
 
-## 5. Env placeholders / secrets
+## 5. No contact fields inside `profiles`
 
-**Safe.** `.env.example` contains only `NEXT_PUBLIC_SUPABASE_URL=`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=`, `SUPABASE_SERVICE_ROLE_KEY=` — no values. Independently grepped the full diff and `.env.example` for hardcoded secrets (JWT-shaped strings, assigned key literals): none found. `src/lib/env.ts` only reads `process.env[name]` and throws if missing — no value is ever hardcoded or logged.
+**Confirmed by direct read of the SQL**, not just Codex's claim — the `profiles` column list contains no `email`, `phone`, or `whatsapp` field anywhere.
 
-## 6. Admin client server-only isolation
+## 6. `profiles.id` → `auth.users(id)`
 
-**Correct, and independently re-verified rather than taken on Codex's word.** `src/lib/supabase/admin.ts` has a module-level guard (`if (typeof window !== "undefined") throw ...`) plus a second, independent guard inside `getSupabaseServiceRoleKey()` in `env.ts` — two layers, not one. I ran my own search (not Codex's reported grep) for any import of `supabase/admin` outside the file itself and for any `"use client"` file referencing the service-role reader: both came back empty. No page, layout, or component currently has any path to this module.
+**Correct.** `id uuid primary key references auth.users(id)`, with a `comment on column` explicitly documenting it as the sole exception to the `user_id` naming rule.
 
-## 7. Service-role key leak risk to client bundle
+## 7. `user_contacts.user_id` → `profiles(id)`
 
-**None currently, and the design resists it going forward.** The key is read only inside `admin.ts` via `getSupabaseServiceRoleKey()`, which is not exported from, or re-exported by, `client.ts`. Since nothing imports `admin.ts` yet, Next's client bundler has no reason to pull it into a browser chunk. The double runtime guard (module-level + function-level `window` check) means that even if a future change accidentally imported it from a client component, the app would throw immediately in the browser rather than silently ship the key — a real defense-in-depth choice, not just an unused safety comment.
+**Correct.** `user_id uuid not null references public.profiles(id) on delete cascade`, plus a `unique (user_id)` constraint enforcing one contact row per user.
 
-## 8. Verification
+## 8. Forbidden identifier
 
-**Passes, independently re-run, not just trusted from the summary.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` (all four internal steps) were all re-run fresh as part of this review and all passed cleanly.
+**Absent.** Independently grepped the migration file for the string formed by `profile` + `_` + `id`: zero matches. (Constraint names like `profiles_graduation_year_bounds` and `user_contacts_user_id_unique` do not contain the forbidden substring — checked character-by-character, not just eyeballed.)
 
-## 9. Line-ending warning in `scripts/run-codex-task.ps1`
+## 9. RLS policies
 
-**Yes, this needs a script fix — it's a real latent bug, not cosmetic noise.** Root cause: `$ErrorActionPreference = "Stop"` is set globally at the top of the script (line 56) and is only locally relaxed to `"Continue"` around the *precondition* `git status` call (lines 84–89). The *post-run* reporting block (lines 153–161: `git status --short`, `git diff --stat`, `git diff --stat --cached`) runs with no such relaxation. On this Windows checkout, git has line-ending settings that make it print `warning: ... LF will be replaced by CRLF ...` to stderr for these exact commands. Under Windows PowerShell 5.1 with `$ErrorActionPreference = "Stop"`, a native command writing to stderr is a documented trigger for a terminating `NativeCommandError` even when the command's actual exit code is 0 — the same failure class already fixed once in this script for the precondition check, but not carried through to the post-run block. This is very likely exactly what the human observed.
+**None present.** Independently grepped for `row level security`, `create policy` (case-insensitive): zero matches. No `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` anywhere.
 
-This did not corrupt or block this review — I re-ran the diagnostics independently and they all resolved cleanly — but left unfixed, it risks the post-run reporting block aborting the script on a future run before the required-summary and off-limits-file checks (lines 163–190) execute, which would silently skip real safety checks rather than just being noisy.
+## 10. Live Supabase operations
 
-## 10. Exact fix (described, not applied per instruction)
+**None attempted.** This is a plain SQL file under `supabase/migrations/`; no CLI command, connection string, or apply/push/reset action appears in the diff or is referenced in `CODEX_SUMMARY.md`'s verification section. Nothing in this task could have touched a live database — there is no code path here that invokes the Supabase CLI or any client.
 
-In `scripts/run-codex-task.ps1`, wrap the post-run reporting block the same way the precondition block already is:
+## 11. Constraints / indexes / triggers
 
-```powershell
-$priorPreference = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
-git status --short
-git diff --stat
-git diff --stat --cached
-$ErrorActionPreference = $priorPreference
-```
+**Reasonable, with one forward-looking note (not a defect in this file):**
+- `graduation_year` bounded via `check` (1900–2100) — sane.
+- `experience_level`, `primary_role`, `preferred_contact_method` constrained via `check (... in (...))` rather than Postgres `enum` types. Codex's stated reasoning (easier to iterate before the schema is ever applied) is sound for a draft; worth a human decision on whether to standardize on `enum` before this is actually applied, but not wrong as drafted.
+- `user_contacts_email_shape` — a light `position('@' in email) > 1` sanity check, not full validation; appropriate for a draft, real validation belongs at the application layer.
+- `user_contacts_user_id_unique` — correctly doubles as the lookup index for `user_id`; a separate explicit index would have been redundant, and Codex's summary correctly explains why one wasn't added.
+- `profiles_university_idx` — matches `/docs/DATABASE.md`'s existing indexing intent for `profiles.university`.
+- Shared `set_updated_at()` trigger function used by both tables — clean, avoids duplicated trigger logic.
+- **Note for the next task, not this one:** `profiles.full_name` is `not null` with no default. `/docs/DATABASE.md`'s data flow #1 describes a signup trigger inserting a `profiles` row immediately on `auth.users` creation, before onboarding. If that trigger is implemented as currently documented, it will need to either supply a `full_name` value at insert time (e.g., derived from auth metadata, or a placeholder) or this constraint will need to become nullable with app-level enforcement of "must complete profile before joining a pool." This isn't a fix needed in this migration — it's a design decision the signup-trigger task must make deliberately rather than discover by a failing insert.
 
-Secondary, complementary fix (repo-level, not script-level): add a `.gitattributes` file with `* text=auto eol=lf` (or equivalent) so line-ending normalization warnings stop being generated at all, rather than only being tolerated. Either fix alone resolves the immediate symptom; both together remove the underlying cause. Neither has been applied — this is a description for a follow-up task, per the instruction not to implement fixes during this review.
+## 12. Verification
+
+**Passes, independently re-run.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and the full `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` gate (all four internal steps, including the forbidden-string scan) were all re-run fresh for this review and all passed cleanly.
+
+## 13. Fixes needed
+
+**None required to approve this task.** The one item worth carrying forward is the `full_name not null` / signup-trigger interaction noted in §11 — recommend the next Phase 3 task (the `auth.users` signup trigger) explicitly decide how that column gets populated at insert time, rather than leaving it to be discovered as a runtime failure once a live database exists.
 
 ## Summary
 
-PHASE3A-001 is clean, correctly scoped, and safe to merge. The one process finding — the line-ending bug in the task runner itself — is unrelated to Codex's work product and should be handled as its own small, explicit follow-up task rather than folded into this one.
+PHASE3B-001 is a clean, correctly-scoped draft migration that delivers exactly the privacy-architecture correction it was asked for. Approved. Two follow-up items for separate, dedicated tasks (not this one): (a) reconcile `/docs/DATABASE.md`'s `profiles` description with this new `user_contacts` split, and (b) decide `full_name`'s population strategy when the signup trigger task is scoped.
