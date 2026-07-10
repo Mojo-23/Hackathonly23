@@ -1,65 +1,73 @@
-# Claude Review — PHASE3D-001
+# Claude Review — PHASE3E-001
 
 ## 1. Verdict
 
 **APPROVE**
 
-The trigger implements D17 exactly: correct fallback chain and order, zero contact-data contact, `user_contacts` untouched, `security definer` used with a sound justification and an explicit `search_path`, RLS left alone entirely. One low-severity edge case is noted below as an advisory for later, not a blocker.
+The test suite is thorough, correctly scoped to local-only operations, uses obviously synthetic data with clean rollback semantics, avoids the forbidden identifier via the same runtime-construction technique used elsewhere in this repo, and every claim in `CODEX_SUMMARY.md` was independently re-verified — not just trusted. One minor coverage gap is noted as an advisory, not a blocker.
 
 ## 2. Scope containment
 
-**Held.** The new migration file was untracked, so I read it directly rather than relying on `git diff --stat` (per your instruction) — confirmed via `git status --short` (`?? supabase/migrations/20260710140000_signup_profile_trigger.sql`) and a full direct read. Diff is exactly that one file plus the standard `handoff/CODEX_SUMMARY.md` write. `git status --short docs/` returned nothing — `/docs` untouched, as required (this task, unlike `PHASE3B-002`/`PHASE3D-000`, was not granted a docs exception).
+**Held.** The test directory was untracked, so I read the file directly (per your instruction) rather than relying on `git diff --stat` — confirmed via `git status --short` (`?? supabase/tests/`) and a full direct read of `supabase/tests/database/identity_foundation.test.sql`. `git status --short supabase/migrations/ docs/` returned nothing — no migration and no doc was touched. Diff is exactly that one test file plus the standard `handoff/CODEX_SUMMARY.md` write.
 
-## 3. Exactly one new trigger migration
+## 3. Tests located under `supabase/tests/`
 
-**Confirmed.** `find supabase/migrations -type f` lists exactly three files: the two prior approved migrations (`PHASE3B-001`, `PHASE3C-001`), plus this task's new `20260710140000_signup_profile_trigger.sql`.
+**Confirmed.** `supabase/tests/database/identity_foundation.test.sql` — one file, correctly placed for `supabase test db --local supabase/tests` discovery.
 
-## 4. `profiles.id = new.id`
+## 4. `profiles`/`user_contacts` existence
 
-**Confirmed by direct read.** `insert into public.profiles (id, full_name) values (new.id, ...)`.
+**Confirmed.** Tests 1–2 use `has_table('public', 'profiles', ...)` and `has_table('public', 'user_contacts', ...)`.
 
-## 5. `full_name` fallback chain
+## 5. Contact data not in `profiles`
 
-**Correct, exact order.** `coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'display_name', 'New participant')` — matches D17 and the task specification precisely, both in the expressions used and their order.
+**Confirmed, and more thorough than the minimum.** Tests 3–5 check the three named columns are absent (`hasnt_column`); test 6 goes further with a regex scan (`column_name ~ '(email|phone|whatsapp|contact)'`) across `information_schema.columns`, catching any differently-named contact-shaped column too, not just the three anticipated names.
 
-One edge case worth flagging as a future advisory, not a blocker: `coalesce` treats an empty string (`''`) as non-null, so if an identity provider ever supplies `raw_user_meta_data->>'full_name'` as an empty string rather than absent, this trigger would set `full_name = ''` rather than falling through to the next option or the placeholder. Not a violation of the task's literal spec (which asked for exactly this `coalesce` chain), and not something Google/typical OAuth metadata is likely to produce in practice, but worth a `nullif(..., '')`-style hardening if this becomes a real signup surface later.
+## 6. Contact data in `user_contacts`
 
-## 6. No email/phone/whatsapp copied into `profiles`
+**Confirmed.** Tests 7–9 (`has_column`) for `email`, `phone`, `whatsapp`.
 
-**Confirmed.** Independently grepped the file for `email|phone|whatsapp|user_contacts`: the only two hits are inside comment lines explicitly stating those fields must never be copied into `profiles` — not in any executable statement. No `new.email` or equivalent appears anywhere.
+## 7. RLS enabled
 
-## 7. `user_contacts` not created by this trigger
+**Confirmed, checked against `pg_class.relrowsecurity` directly** (tests 10–11) rather than inferring it from policy presence alone — the correct way to verify RLS is actually *enabled*, not just that policies exist. Codex also added six extra tests (12–17) confirming each specific self-owned policy name/command exists on both tables — not explicitly required by the task's eleven-item list, but a reasonable, in-spirit extension given the task's own "Relevant docs" section pointed at `RLS_ACCESS_MATRIX.md`'s self-owned-only description as what these tests should confirm.
 
-**Confirmed.** No reference to `public.user_contacts` anywhere in the file outside the explanatory comments. The insert touches only `public.profiles`.
+## 8. Signup trigger exists
 
-## 8. `security definer` + explicit `search_path`
+**Confirmed.** Test 18 checks `pg_proc` for `create_profile_for_new_user` with 0 args and `trigger` return type — matching the actual function signature in `20260710140000_signup_profile_trigger.sql`, not a guessed name. Test 19 confirms the `auth.users` trigger `create_profile_after_signup` is wired to that exact function via a `pg_trigger`/`pg_proc` join.
 
-**Confirmed, and the choice is architecturally justified, not just present.** The function is `security definer` with `set search_path = public, pg_temp`. This is necessary, not optional decoration: a trigger firing on `auth.users` insert executes outside any authenticated user's session context (there is no valid `auth.uid()` yet for the row being created), so the existing `profiles_insert_own` RLS policy (`auth.uid() = id`) cannot be satisfied by the trigger's own execution context — `security definer` is the standard, correct mechanism to let this specific, narrow function bypass that gap. The `search_path` pin follows the standard Postgres/Supabase hardening pattern for `security definer` functions (prevents search-path-hijacking via a malicious object in an earlier-resolved schema).
+## 9. Signup creates a `profiles` row
 
-## 9. `ON CONFLICT` / idempotency
+**Confirmed, and behaviorally exercised, not just structurally asserted.** A synthetic `auth.users` row is inserted (test setup), then test 20 asserts exactly one matching `profiles` row exists, test 21 asserts `full_name` is non-null, and test 22 asserts it equals the exact metadata value supplied (`'Synthetic Signup Tester'`) — a real behavioral check of the trigger's primary fallback path, not just "some string exists."
 
-**Handled safely.** `on conflict (id) do nothing` — a second invocation for the same `auth.users.id` is a no-op rather than an error or an overwrite of an existing profile. The migration also does `drop trigger if exists ... ` before creating it, which is good migration-file hygiene (safe to reason about even though nothing is applied in this task).
+Minor coverage gap, not a blocker: only the first branch of D17's four-step fallback chain (`raw_user_meta_data->>'full_name'`) is exercised. The `name`/`display_name`/placeholder fallback branches aren't tested here. The task's acceptance criteria only required "a non-null `full_name`," which is met — but a future task could usefully add 2–3 more synthetic-insert cases exercising the other fallback branches for full confidence in D17's chain, not just its first link.
 
-## 10. No RLS policies created or modified
+## 10. Signup does not create a `user_contacts` row
 
-**Confirmed.** Independently grepped for `create policy|drop policy|alter policy|enable row level security|disable row level security`: zero matches. `profiles_insert_own`, `profiles_select_own`, `profiles_update_own`, and both `user_contacts` policies from `PHASE3C-001` are untouched, exactly as D17 requires (that tightening is explicitly deferred).
+**Confirmed.** Test 23 asserts `count(*) = 0` in `user_contacts` for the synthetic user id after signup.
 
-## 11. Forbidden identifier
+## 11. Synthetic, local-only data
 
-**Absent.** Independently grepped the full migration file for the string formed by `profile` + `_` + `id`: zero matches. (`create_profile_for_new_user`, `create_profile_after_signup` do not contain the forbidden substring.)
+**Confirmed, well-chosen values.** UUID `11111111-1111-4111-8111-111111111111`, email `test-signup-001@example.invalid` (`.invalid` is the RFC 2606-reserved TLD for exactly this purpose), phone/WhatsApp values using the `555` exchange (the standard reserved-fake NANP prefix), and an obviously synthetic display name. No real data, no real credential, no real Supabase URL/key anywhere — independently grepped for JWT-shaped and key-shaped strings, zero matches. Cleanup is handled correctly: a pre-test `delete` guards against a prior interrupted run leaving residue, and the actual test body runs inside `begin; ... rollback;`, so a normal successful run leaves no synthetic data behind.
 
-## 12. No live Supabase operation attempted
+## 12. Forbidden identifier avoided as a literal
 
-**Confirmed.** Static SQL file only; no CLI command, connection string, or apply/push/reset action appears anywhere in the diff or `CODEX_SUMMARY.md`.
+**Confirmed by direct grep of the file: zero matches for the literal string.** Test 25 builds the forbidden pattern at query-runtime via `concat('%', 'profile', chr(95), 'id', '%')` — the same technique already used in `scripts/run-codex-task.ps1` to avoid the literal substring appearing in source while still checking for it functionally. This test scans relevant table/column/function/trigger/policy names across `public.profiles`, `public.user_contacts`, and `auth.users` for that pattern.
 
-## 13. Verification
+## 13. `npx supabase db reset` passes
 
-**Passes, independently re-run.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and the full `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` gate (including the forbidden-string scan) were all re-run fresh for this review and all passed cleanly.
+**Confirmed, independently re-run.** I ran it myself: all three migrations applied cleanly. One informational `WARN: no files matched pattern: supabase/seed.sql` appeared, matching what `CODEX_SUMMARY.md` reported — this is expected (no seed file exists yet in this project) and does not affect reset success or test correctness.
 
-## 14. Fixes needed
+## 14. `npx supabase test db --local supabase/tests` passes
 
-**None required to approve this task.** One advisory for a future task, not this one: consider `nullif(x, '')`-style hardening of the fallback chain against empty-string metadata values (see §5).
+**Confirmed, independently re-run.** `Files=1, Tests=25, Result: PASS` — matches your reported result exactly.
+
+## 15. `verify.ps1` passes
+
+**Confirmed, independently re-run.** All four steps (build, typecheck, lint, forbidden-string scan) passed cleanly.
+
+## 16. Fixes needed
+
+**None required to approve this task.** One advisory for a future task, not this one: add synthetic-insert coverage for the remaining `full_name` fallback branches (`name`, `display_name`, placeholder) — see §9.
 
 ## Summary
 
-PHASE3D-001 correctly and completely implements the trigger half of D17: minimal `profiles` row, exact fallback chain, zero contact-data contact, `user_contacts` left entirely to onboarding, RLS left entirely alone, `security definer` used for a real architectural reason with proper hardening. Approved. The RLS-tightening half of D17 (revisiting `profiles_insert_own` now that this trigger exists) remains correctly deferred to its own future, separately-approved task.
+PHASE3E-001 delivers a genuinely thorough, correctly-scoped local test suite: structural checks for both tables and their columns, RLS enablement verified at the catalog level (not inferred), trigger existence and wiring verified against actual object names read from the migration files, a real behavioral exercise of the signup path with a whole-row leak check for contact values, and a forbidden-identifier guard that itself follows the project's established pattern for not writing the literal string. Approved. Local-only command discipline was maintained throughout — no remote connection, push, or SQL Editor use anywhere.
