@@ -1,39 +1,53 @@
 # Codex Summary
 
 ## Task
-`WORKFLOW-TEST-001`
+`PHASE3A-001`
 
 ## What changed
-- Created `handoff/WORKFLOW_TEST.md`.
-- The file states that the workflow test passed.
-- The file lists the verification checks invoked by `scripts/verify.ps1`.
+- Added the authorized Supabase dependencies: `@supabase/supabase-js` and `@supabase/ssr`.
+- Added `.env.example` with empty placeholder values only:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Added `src/lib/env.ts` runtime env readers. Values are read from `process.env`; no Supabase URL or key is hardcoded.
+- Added Supabase client scaffolding:
+  - `src/lib/supabase/client.ts`: browser client factory using only public URL/anon key.
+  - `src/lib/supabase/server.ts`: server client factory using `@supabase/ssr` and Next cookie handling, using only public URL/anon key.
+  - `src/lib/supabase/admin.ts`: service-role factory using `SUPABASE_SERVICE_ROLE_KEY` via `src/lib/env.ts`, with a top-level server-only guard/comment.
+
+No pages, layouts, or components import or call these helpers yet.
 
 ## Files touched
-- `handoff/WORKFLOW_TEST.md`
+- `.gitignore`
+- `.env.example`
+- `package.json`
+- `package-lock.json`
+- `src/lib/env.ts`
+- `src/lib/supabase/client.ts`
+- `src/lib/supabase/server.ts`
+- `src/lib/supabase/admin.ts`
 - `handoff/CODEX_SUMMARY.md`
 
-Only the workflow test file was created before verification; this summary is the standard handoff write requested by `AGENTS.md`.
-
 ## Verification
-Attempted:
-- `powershell -File scripts/verify.ps1`
-
-Result:
-- Failed before repo checks ran because local PowerShell script execution is disabled by policy.
-
-Retried with a process-local policy bypass:
-- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
-
-Results from the retry:
-- `npm run build`: failed. Next/Turbopack could not fetch Google-hosted `Geist` and `Geist Mono` fonts because the environment cannot establish the network connection.
+Ran individually:
+- `npm run build`: passed.
 - `npx tsc --noEmit`: passed.
-- `npx eslint .`: passed.
-- Forbidden-string scan: failed on an existing occurrence in `scripts/run-codex-task.ps1:109`.
+- `npx eslint .`: passed after removing one unused-constant warning.
+
+Ran final required gate:
+- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`: passed.
+  - `npm run build`: OK
+  - `npx tsc --noEmit`: OK
+  - `npx eslint .`: OK
+  - forbidden string scan: OK
+
+Manual checks:
+- `rg 'supabase/admin|src/lib/supabase/admin|@/lib/supabase/admin|\\.\\./.*supabase/admin' -n src` returned no matches, so `src/lib/supabase/admin.ts` has no import path from any current client component or app file.
+- No `supabase/migrations` directory or SQL file was created.
+- No real Supabase URL, anon key, or service-role key was entered anywhere.
 
 ## Deviations
-- I did not modify `scripts/run-codex-task.ps1` or `src/app/layout.tsx` to resolve verification failures because the task explicitly allows changes only to `handoff/WORKFLOW_TEST.md` and this standard summary.
-- No `/docs`, `src/`, `package.json`, Supabase, migration, auth, RLS, or contact-reveal files were modified.
+- `.gitignore` was touched even though it was not in the expected-files list. Reason: the repo ignored all `.env*` files, so the required `.env.example` would otherwise be created locally but remain untrackable. The change only unignores `.env.example` and `.env.local.example`.
 
 ## Open questions
-- Should the existing forbidden-string occurrence in `scripts/run-codex-task.ps1` be fixed in a separate task?
-- Should the build be adjusted in a separate task to avoid network-dependent Google font fetches during verification?
+- None. No schema, migration, RLS, contact-reveal, auth UI, or page behavior work was added.

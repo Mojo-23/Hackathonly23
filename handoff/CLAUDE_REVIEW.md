@@ -1,45 +1,60 @@
-# Claude Review — WORKFLOW-TEST-001
+# Claude Review — PHASE3A-001
 
 ## 1. Verdict
 
 **APPROVE**
 
-Codex's actual deliverable for this task was correct, minimal, and did exactly what was asked — nothing more. The build/lint/forbidden-string issues it surfaced were pre-existing infrastructure bugs unrelated to the task's own scope, and Codex was right not to touch them. Those bugs have since been fixed directly by Claude/human under explicit instruction in a separate, non-Codex turn (see §5), and are not a mark against this task's review.
+Codex's deliverable matches the task's scope, acceptance criteria, and every hard constraint. One legitimate, correctly-justified deviation (`.gitignore`) is noted below and is approved as part of this review rather than sent back for rework. Independent re-verification (not just trusting `CODEX_SUMMARY.md`) confirms the build/typecheck/lint/forbidden-string gates all pass and the admin client is genuinely unreachable from client code.
 
 ## 2. Scope containment
 
-**Held.** Cross-checking `handoff/CODEX_SUMMARY.md`'s own account against the task's acceptance criteria in `tasks/current-task.md`:
+**Held.** Diff touches exactly: `package.json`, `package-lock.json`, `.gitignore`, `.env.example`, `src/lib/env.ts`, `src/lib/supabase/client.ts`, `src/lib/supabase/server.ts`, `src/lib/supabase/admin.ts`, and the standard `handoff/CODEX_SUMMARY.md` write. No `/docs`, no `AGENTS.md`/`CLAUDE.md`, no `scripts/*.ps1`, no auth UI, no profile UI, no `supabase/migrations`, no page/layout/component behavior change (confirmed independently: `npm run build`'s route table is identical to before this task — no new routes, same static/dynamic split). Codex explicitly did not wire these clients into any page, exactly as the task required ("must not be called anywhere yet").
 
-- `handoff/WORKFLOW_TEST.md` created — states the test passed, lists the four verification checks (`npm run build`, `npx tsc --noEmit`, `npx eslint .`, forbidden-string scan). Matches the "In scope" section exactly.
-- No file under `src/`, `/docs`, or `package.json` touched.
-- No Supabase, migration, or auth-related file created or touched.
-- Only `handoff/WORKFLOW_TEST.md` and the standard `handoff/CODEX_SUMMARY.md` handoff write were produced.
-- Codex explicitly declined to modify `scripts/run-codex-task.ps1` or `src/app/layout.tsx` to fix the failures it hit, on the grounds that the task didn't authorize it — correct call per `AGENTS.md`'s "don't add scope" and "when you're unsure, stop and report" rules. It raised both as open questions instead of guessing.
+## 3. `package.json` changes
 
-## 3. Forbidden files
+**Approved deps only.** `dependencies` gained exactly `@supabase/ssr` (`^0.12.0`) and `@supabase/supabase-js` (`^2.110.2`) — nothing else added, nothing existing removed or bumped. `package-lock.json`'s ~120 added lines are the transitive tree of those two packages (`@supabase/auth-js`, `functions-js`, `postgrest-js`, `realtime-js`, `storage-js`, plus `cookie`, `phoenix`, `iceberg-js`) — checked each entry resolves to a real `registry.npmjs.org` tarball with an integrity hash, consistent with an ordinary `npm install`, not hand-edited.
 
-**None modified.** No file under `/docs`, `AGENTS.md`, or `CLAUDE.md` appears in Codex's reported change set, and its own summary corroborates this.
+## 4. `.gitignore` changes
 
-## 4. Verification status
+**Appropriate, and correctly flagged as a deviation rather than silently done.** The two added lines (`!.env.example`, `!.env.local.example`) only *un-ignore* the example files — the blanket `.env*` ignore rule for real env files is untouched. Without this, `.env.example` would exist locally but never be committable, defeating the task's own requirement to create it. This is exactly the kind of small, necessary, honestly-reported deviation the workflow is supposed to tolerate — Codex named it, explained why, and kept the change to the minimum needed.
 
-At the time Codex ran, verification **did not fully pass** — and Codex reported that honestly rather than hiding it:
-- `powershell -File scripts/verify.ps1` failed outright (local execution policy blocked the script before any check ran).
-- Retried with `-ExecutionPolicy Bypass`: `npm run build` failed (Google-hosted `Geist`/`Geist Mono` fonts unreachable — network-dependent build), `npx tsc --noEmit` and `npx eslint .` passed, and the forbidden-string scan failed on a real hit in `scripts/run-codex-task.ps1:109` (the rule's own documentation text, not implementation code — a scanner false positive).
+## 5. Env placeholders / secrets
 
-All three problems were fixed afterward, outside this task's scope, by explicit human instruction: the PowerShell invocation was standardized to `-ExecutionPolicy Bypass` everywhere, the Google Fonts dependency was replaced with a system-font stack, and `run-codex-task.ps1` now builds the forbidden identifier at runtime instead of writing it as a literal. Re-running `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` now passes all four steps cleanly (confirmed again as part of this review — see the report accompanying this file).
+**Safe.** `.env.example` contains only `NEXT_PUBLIC_SUPABASE_URL=`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=`, `SUPABASE_SERVICE_ROLE_KEY=` — no values. Independently grepped the full diff and `.env.example` for hardcoded secrets (JWT-shaped strings, assigned key literals): none found. `src/lib/env.ts` only reads `process.env[name]` and throws if missing — no value is ever hardcoded or logged.
 
-## 5. Remaining workflow risks
+## 6. Admin client server-only isolation
 
-1. **The fix-forward path is unproven.** This cycle only exercised "Codex builds something clean." It has not yet exercised "Codex receives a fix task and correctly narrows its change to just the fix" — that's a materially different failure mode (scope creep during a fix is more likely than during a green-field build).
-2. **The approval-gate path is unproven.** Nothing has tested that Codex actually stops when a task requires a migration or RLS change without explicit approval language present. This is the single highest-stakes untested behavior given Phase 3's shape, and I'd want a dedicated dry run (a task that touches schema without approval, confirming Codex halts) before trusting it on real migrations.
-3. **The post-run guards in `run-codex-task.ps1` (required `CODEX_SUMMARY.md`, docs/AGENTS/CLAUDE guard, git status/diff summary) were added after this smoke test ran and have never fired against a live Codex invocation.** Logic is simple and was read carefully in this review, but "read carefully" isn't the same as "observed working."
-4. **This review itself is the first time `CLAUDE_REVIEW.md` has been produced.** The review step of the loop was, until this file, only described, not demonstrated.
-5. **Infrastructure fixes happened outside the task loop.** Necessary and correctly scoped given they were tooling bugs blocking the loop itself, but worth naming: the loop hasn't yet shown it can self-heal a bug Codex reports without a human stepping outside the loop to do it. Not a defect — just a boundary of what's been proven so far.
+**Correct, and independently re-verified rather than taken on Codex's word.** `src/lib/supabase/admin.ts` has a module-level guard (`if (typeof window !== "undefined") throw ...`) plus a second, independent guard inside `getSupabaseServiceRoleKey()` in `env.ts` — two layers, not one. I ran my own search (not Codex's reported grep) for any import of `supabase/admin` outside the file itself and for any `"use client"` file referencing the service-role reader: both came back empty. No page, layout, or component currently has any path to this module.
 
-## 6. Is the Claude/Codex loop now proven?
+## 7. Service-role key leak risk to client bundle
 
-**Partially.** Proven: task → Codex implements → Codex verifies honestly (including reporting failures it didn't cause and shouldn't fix) → Codex hands off → Claude reviews the diff against the task and writes a verdict. That is the core loop, and it held up correctly end to end, including Codex's judgment call to not overstep.
+**None currently, and the design resists it going forward.** The key is read only inside `admin.ts` via `getSupabaseServiceRoleKey()`, which is not exported from, or re-exported by, `client.ts`. Since nothing imports `admin.ts` yet, Next's client bundler has no reason to pull it into a browser chunk. The double runtime guard (module-level + function-level `window` check) means that even if a future change accidentally imported it from a client component, the app would throw immediately in the browser rather than silently ship the key — a real defense-in-depth choice, not just an unused safety comment.
 
-Not yet proven: the approval-gated path (migrations/RLS) and the fix-forward path (Codex correcting a flagged issue on a follow-up task). Both are directly relevant to Phase 3, where several tasks will require explicit migration/RLS approval language. I'd treat the first migration-approval task in Phase 3 as a second checkpoint, not a routine task — worth watching closely rather than assuming the gate will hold just because the rule is written down in three places.
+## 8. Verification
 
-**Recommendation:** proceed to schema/approval-free Phase 3 slices (e.g. a Supabase client scaffold with no tables) with normal confidence. Treat the first task that carries a migration/RLS approval as a trust-building checkpoint, reviewed at least as carefully as this one.
+**Passes, independently re-run, not just trusted from the summary.** `npm run build`, `npx tsc --noEmit`, `npx eslint .`, and `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` (all four internal steps) were all re-run fresh as part of this review and all passed cleanly.
+
+## 9. Line-ending warning in `scripts/run-codex-task.ps1`
+
+**Yes, this needs a script fix — it's a real latent bug, not cosmetic noise.** Root cause: `$ErrorActionPreference = "Stop"` is set globally at the top of the script (line 56) and is only locally relaxed to `"Continue"` around the *precondition* `git status` call (lines 84–89). The *post-run* reporting block (lines 153–161: `git status --short`, `git diff --stat`, `git diff --stat --cached`) runs with no such relaxation. On this Windows checkout, git has line-ending settings that make it print `warning: ... LF will be replaced by CRLF ...` to stderr for these exact commands. Under Windows PowerShell 5.1 with `$ErrorActionPreference = "Stop"`, a native command writing to stderr is a documented trigger for a terminating `NativeCommandError` even when the command's actual exit code is 0 — the same failure class already fixed once in this script for the precondition check, but not carried through to the post-run block. This is very likely exactly what the human observed.
+
+This did not corrupt or block this review — I re-ran the diagnostics independently and they all resolved cleanly — but left unfixed, it risks the post-run reporting block aborting the script on a future run before the required-summary and off-limits-file checks (lines 163–190) execute, which would silently skip real safety checks rather than just being noisy.
+
+## 10. Exact fix (described, not applied per instruction)
+
+In `scripts/run-codex-task.ps1`, wrap the post-run reporting block the same way the precondition block already is:
+
+```powershell
+$priorPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+git status --short
+git diff --stat
+git diff --stat --cached
+$ErrorActionPreference = $priorPreference
+```
+
+Secondary, complementary fix (repo-level, not script-level): add a `.gitattributes` file with `* text=auto eol=lf` (or equivalent) so line-ending normalization warnings stop being generated at all, rather than only being tolerated. Either fix alone resolves the immediate symptom; both together remove the underlying cause. Neither has been applied — this is a description for a follow-up task, per the instruction not to implement fixes during this review.
+
+## Summary
+
+PHASE3A-001 is clean, correctly scoped, and safe to merge. The one process finding — the line-ending bug in the task runner itself — is unrelated to Codex's work product and should be handled as its own small, explicit follow-up task rather than folded into this one.
