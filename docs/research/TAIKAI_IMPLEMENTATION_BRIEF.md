@@ -15,6 +15,8 @@
 
 Every direction below has been checked against this list; none require an exception.
 
+> **Status: reference/implementation brief, executed and adopted.** The directions in this document were implemented across the public experience (landing, `/organizers`, `/participants`, `/blog`, `/events`, shared header/footer), and that implementation is now the **official Hackathonly public design** — not an experiment, prototype, or proposed direction. See `handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md` for the current, authoritative build record. This brief remains useful as the reasoning trail for *why* each structural choice was made; it is not itself the live spec — the shipped code and `docs/DESIGN_SYSTEM.md`/`docs/MOTION_SYSTEM.md` are.
+
 > **Revision note (binding human decision, post-publication):** this brief originally recommended reverting event-cover and avatar photography to a fully typographic/geometric system, on the grounds that the existing implementation used runtime-hotlinked external images. The human has since made an explicit, binding correction: **the photography direction itself is approved and must be kept — the hotlinking method was the only problem.** Directions 6 and 7 below, the affected Gap Analysis rows, and Priority Action Plan item 1 have all been rewritten accordingly. Photography must be downloaded, stored locally under `public/images/`, optimized, consistently cropped, curated, and color-graded to Sandstone Editorial — never hotlinked, never generic corporate stock. A typographic/geometric fallback remains available only for cases with no approved image.
 
 ---

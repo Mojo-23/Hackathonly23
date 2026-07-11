@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -46,12 +47,12 @@ const previewQueue = [
 ];
 
 const modules = [
-  { icon: ClipboardCheck, label: "Registration" },
-  { icon: Handshake, label: "Matching" },
-  { icon: QrCode, label: "Check-in" },
-  { icon: FolderGit2, label: "Submissions" },
-  { icon: Gavel, label: "Judging" },
-  { icon: Trophy, label: "Reports" },
+  { icon: ClipboardCheck, label: "Registration", view: "organizer" as const },
+  { icon: Handshake, label: "Matching", view: "participant" as const },
+  { icon: QrCode, label: "Check-in", view: "organizer" as const },
+  { icon: FolderGit2, label: "Submissions", view: "organizer" as const },
+  { icon: Gavel, label: "Judging", view: "organizer" as const },
+  { icon: Trophy, label: "Reports", view: "organizer" as const },
 ];
 
 const previewStats = [
@@ -59,6 +60,12 @@ const previewStats = [
   { icon: Users, label: "In matching pool", value: commandCenterMetrics.matchingPoolSize },
   { icon: Handshake, label: "Teams formed", value: commandCenterMetrics.teamsFormed },
   { icon: FileCheck2, label: "Sponsor opt-ins", value: commandCenterMetrics.sponsorOptInCount },
+];
+
+const readinessChecklist = [
+  { label: "QR check-in configured", detail: "Scanner + manual search ready for event day" },
+  { label: "Judging criteria set", detail: "Weights confirmed, judges assigned" },
+  { label: "Sponsor report template ready", detail: "Builds automatically from consented data" },
 ];
 
 const proposal = myProposals[0];
@@ -155,6 +162,7 @@ export default function LandingPage() {
   const featuredEvents = hackathons.slice(0, 3);
   const reducedMotion = useReducedMotionSafe();
   const parallax = useCursorParallax(8);
+  const [activeView, setActiveView] = useState<"participant" | "organizer">("participant");
 
   return (
     <div className="overflow-x-clip bg-background-default text-text-primary">
@@ -176,7 +184,7 @@ export default function LandingPage() {
               variants={heroText}
               className="mt-5 font-display text-display-lg font-semibold text-text-primary text-balance sm:text-display-xl"
             >
-              The operating system for hackathons in Jordan.
+              The <span className="text-brand">operating system</span> for hackathons in Jordan.
             </motion.h1>
             <motion.p
               variants={heroText}
@@ -188,26 +196,40 @@ export default function LandingPage() {
             </motion.p>
             <motion.div
               variants={heroText}
-              className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+              className="mt-8 flex flex-wrap items-center justify-center gap-3"
             >
-              <Link href="/events" className={buttonVariants({ size: "lg" })}>
-                Browse events <ArrowRight className="size-4" strokeWidth={1.75} />
+              <Link href="/participants" className={buttonVariants({ size: "lg" })}>
+                For participants <ArrowRight className="size-4" strokeWidth={1.75} />
               </Link>
-              <Link
-                href="/organizer/events/jordan-ai-builders-hackathon"
-                className="group inline-flex items-center gap-1.5 text-body-sm font-medium text-text-secondary transition-colors duration-[var(--motion-fast)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
-              >
+              <Link href="/organizers" className={buttonVariants({ size: "lg", variant: "secondary" })}>
                 For organizers
-                <ArrowRight
-                  className="size-4 transition-transform duration-[var(--motion-fast)] group-hover:translate-x-1"
-                  strokeWidth={1.75}
-                />
               </Link>
+            </motion.div>
+
+            <motion.div
+              variants={heroText}
+              className="mx-auto mt-8 inline-flex w-fit items-center gap-1 rounded-pill border border-border-default bg-background-sunken p-1"
+            >
+              {(["participant", "organizer"] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={activeView === view}
+                  onClick={() => setActiveView(view)}
+                  className={
+                    activeView === view
+                      ? "rounded-pill bg-background-inverse px-4 py-2 text-body-sm font-medium text-text-inverse transition-colors duration-[var(--motion-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
+                      : "rounded-pill px-4 py-2 text-body-sm font-medium text-text-secondary transition-colors duration-[var(--motion-fast)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
+                  }
+                >
+                  {view === "participant" ? "Participant view" : "Organizer view"}
+                </button>
+              ))}
             </motion.div>
           </motion.div>
 
           <motion.div
-            className="mx-auto mt-20 max-w-6xl overflow-hidden rounded-overlay border border-border-strong bg-background-default shadow-overlay"
+            className="mx-auto mt-10 max-w-6xl overflow-hidden rounded-overlay border border-border-strong bg-background-default shadow-overlay"
             initial="hidden"
             animate="visible"
             variants={scaleIn}
@@ -223,7 +245,7 @@ export default function LandingPage() {
                 </span>
                 <div>
                   <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    Event intelligence OS
+                    {activeView === "participant" ? "Participant view" : "Organizer view"}
                   </p>
                   <p className="text-body-sm font-semibold text-text-primary">
                     Jordan AI Builders Hackathon
@@ -245,13 +267,13 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr]">
               <div className="hidden flex-col gap-1 border-e border-border-default bg-background-sunken p-3 lg:flex">
-                {modules.map((module, index) => (
+                {modules.map((module) => (
                   <div
                     key={module.label}
                     className={
-                      index === 1
-                        ? "flex items-center gap-2.5 rounded-control bg-brand-tint px-3 py-2 text-body-sm font-medium text-brand"
-                        : "flex items-center gap-2.5 rounded-control px-3 py-2 text-body-sm text-text-secondary"
+                      module.view === activeView
+                        ? "flex items-center gap-2.5 rounded-control bg-background-inverse px-3 py-2 text-body-sm font-medium text-text-inverse transition-colors duration-[var(--motion-fast)]"
+                        : "flex items-center gap-2.5 rounded-control px-3 py-2 text-body-sm text-text-secondary transition-colors duration-[var(--motion-fast)]"
                     }
                   >
                     <module.icon className="size-4 shrink-0" strokeWidth={1.75} />
@@ -260,104 +282,162 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr]">
-                <div className="border-b border-border-default p-6 lg:border-b-0 lg:border-e">
-                  <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    Team formation queue
-                  </p>
-                  <MotionStagger className="mt-4 space-y-3" staggerDelay={0.1} initialDelay={0.6}>
-                    {previewQueue.map((person) => (
-                      <MotionStaggerItem
-                        key={person.name}
-                        className="flex items-center gap-3 rounded-card border border-border-default bg-background-sunken p-3"
-                      >
-                        <Image
-                          src={person.avatar}
-                          alt={person.name}
-                          width={44}
-                          height={44}
-                          className="size-11 shrink-0 rounded-pill border border-border-strong object-cover"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-body-sm font-semibold text-text-primary">
-                            {person.name}
-                          </p>
-                          <p className="truncate text-body-sm text-text-secondary">
-                            {person.role} · {person.skill}
-                          </p>
-                        </div>
-                        <span
-                          className={
-                            person.status === "success"
-                              ? "shrink-0 rounded-pill bg-status-success-tint px-2.5 py-1 text-label font-medium text-status-success-fg"
-                              : "shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg"
-                          }
-                        >
-                          {person.status === "success" ? "Accepted" : "Pending"}
-                        </span>
-                      </MotionStaggerItem>
-                    ))}
-                  </MotionStagger>
-
-                  {proposal ? (
-                    <MotionReveal variants={fadeUpSm} delay={0.9} className="mt-5">
+              <AnimatePresence mode="wait" initial={false}>
+                {activeView === "participant" ? (
+                  <motion.div
+                    key="participant"
+                    initial={reducedMotion ? undefined : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={reducedMotion ? undefined : { opacity: 0 }}
+                    transition={{ duration: duration.base, ease: easing.standard }}
+                    className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr]"
+                  >
+                    <div className="border-b border-border-default p-6 lg:border-b-0 lg:border-e">
                       <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                        Your proposal
+                        Team formation queue
                       </p>
-                      <div className="mt-3 rounded-card border border-border-default bg-background-sunken p-3.5">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-body-sm font-semibold text-text-primary">
-                            {proposal.hackathonTitle}
-                          </p>
-                          <span className="shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg">
-                            Expires in {proposal.expiresInHours}h
-                          </span>
-                        </div>
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-pill bg-border-default">
-                          <motion.div
-                            className="h-full rounded-pill bg-status-success-fg"
-                            initial={reducedMotion ? undefined : { scaleX: 0 }}
-                            whileInView={
-                              reducedMotion
-                                ? undefined
-                                : { scaleX: proposal.membersAccepted / proposal.membersTotal }
-                            }
-                            viewport={{ once: true }}
-                            style={{
-                              transformOrigin: "left",
-                              scaleX: reducedMotion
-                                ? proposal.membersAccepted / proposal.membersTotal
-                                : undefined,
-                            }}
-                            transition={{ duration: duration.slow, ease: easing.standard, delay: 1 }}
-                          />
-                        </div>
-                        <p className="mt-2 text-body-sm text-text-secondary">
-                          {proposal.membersAccepted} of {proposal.membersTotal} teammates accepted
-                        </p>
-                      </div>
-                    </MotionReveal>
-                  ) : null}
-                </div>
+                      <MotionStagger className="mt-4 space-y-3" staggerDelay={0.1} initialDelay={0.3}>
+                        {previewQueue.map((person) => (
+                          <MotionStaggerItem
+                            key={person.name}
+                            className="flex items-center gap-3 rounded-card border border-border-default bg-background-sunken p-3"
+                          >
+                            <Image
+                              src={person.avatar}
+                              alt={person.name}
+                              width={44}
+                              height={44}
+                              className="size-11 shrink-0 rounded-pill border border-border-strong object-cover"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-body-sm font-semibold text-text-primary">
+                                {person.name}
+                              </p>
+                              <p className="truncate text-body-sm text-text-secondary">
+                                {person.role} · {person.skill}
+                              </p>
+                            </div>
+                            <span
+                              className={
+                                person.status === "success"
+                                  ? "shrink-0 rounded-pill bg-status-success-tint px-2.5 py-1 text-label font-medium text-status-success-fg"
+                                  : "shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg"
+                              }
+                            >
+                              {person.status === "success" ? "Accepted" : "Pending"}
+                            </span>
+                          </MotionStaggerItem>
+                        ))}
+                      </MotionStagger>
 
-                <div className="grid grid-cols-2 divide-x divide-border-default border-t border-border-default lg:divide-y-0 lg:border-t-0">
-                  {previewStats.map((stat, index) => (
-                    <FloatingElement
-                      key={stat.label}
-                      className={index >= 2 ? "border-t border-border-default p-5" : "p-5"}
-                      distance={4}
-                      loopDuration={duration.ambient + index}
-                      delay={index * 0.4}
-                    >
-                      <stat.icon className="size-4 text-text-tertiary" strokeWidth={1.75} />
-                      <p className="mt-4 text-metric font-semibold tabular-nums text-text-primary">
-                        <MotionCounter value={stat.value} />
+                      {proposal ? (
+                        <MotionReveal variants={fadeUpSm} delay={0.5} className="mt-5">
+                          <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                            Your proposal
+                          </p>
+                          <div className="mt-3 rounded-card border border-border-default bg-background-sunken p-3.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-body-sm font-semibold text-text-primary">
+                                {proposal.hackathonTitle}
+                              </p>
+                              <span className="shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg">
+                                Expires in {proposal.expiresInHours}h
+                              </span>
+                            </div>
+                            <div className="mt-3 h-1.5 overflow-hidden rounded-pill bg-border-default">
+                              <motion.div
+                                className="h-full rounded-pill bg-status-success-fg"
+                                initial={reducedMotion ? undefined : { scaleX: 0 }}
+                                animate={{ scaleX: proposal.membersAccepted / proposal.membersTotal }}
+                                style={{ transformOrigin: "left" }}
+                                transition={{ duration: duration.slow, ease: easing.standard, delay: 0.6 }}
+                              />
+                            </div>
+                            <p className="mt-2 text-body-sm text-text-secondary">
+                              {proposal.membersAccepted} of {proposal.membersTotal} teammates accepted
+                            </p>
+                          </div>
+                        </MotionReveal>
+                      ) : null}
+                    </div>
+
+                    <div className="grid grid-cols-2 divide-x divide-border-default border-t border-border-default lg:divide-y-0 lg:border-t-0">
+                      {previewStats.map((stat, index) => (
+                        <FloatingElement
+                          key={stat.label}
+                          className={index >= 2 ? "border-t border-border-default p-5" : "p-5"}
+                          distance={4}
+                          loopDuration={duration.ambient + index}
+                          delay={index * 0.4}
+                        >
+                          <stat.icon className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                          <p className="mt-4 text-metric font-semibold tabular-nums text-text-primary">
+                            <MotionCounter value={stat.value} />
+                          </p>
+                          <p className="mt-1 text-body-sm text-text-secondary">{stat.label}</p>
+                        </FloatingElement>
+                      ))}
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="organizer"
+                    initial={reducedMotion ? undefined : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={reducedMotion ? undefined : { opacity: 0 }}
+                    transition={{ duration: duration.base, ease: easing.standard }}
+                    className="grid grid-cols-1 md:grid-cols-2"
+                  >
+                    <div className="border-b border-border-default p-6 md:border-b-0 md:border-e">
+                      <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                        Registration health
                       </p>
-                      <p className="mt-1 text-body-sm text-text-secondary">{stat.label}</p>
-                    </FloatingElement>
-                  ))}
-                </div>
-              </div>
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <FloatingElement distance={4} loopDuration={duration.ambient} delay={0}>
+                          <ClipboardList className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                          <p className="mt-3 text-metric font-semibold tabular-nums text-text-primary">
+                            <MotionCounter value={commandCenterMetrics.registrations} />
+                          </p>
+                          <p className="mt-1 text-body-sm text-text-secondary">Registered</p>
+                        </FloatingElement>
+                        <FloatingElement distance={4} loopDuration={duration.ambient + 1} delay={0.3}>
+                          <Users2 className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                          <p className="mt-3 text-metric font-semibold tabular-nums text-text-primary">
+                            <MotionCounter value={commandCenterMetrics.accepted} />
+                          </p>
+                          <p className="mt-1 text-body-sm text-text-secondary">Accepted</p>
+                        </FloatingElement>
+                        <FloatingElement distance={4} loopDuration={duration.ambient + 2} delay={0.6}>
+                          <Handshake className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                          <p className="mt-3 text-metric font-semibold tabular-nums text-text-primary">
+                            <MotionCounter value={commandCenterMetrics.matchingPoolSize} />
+                          </p>
+                          <p className="mt-1 text-body-sm text-text-secondary">In matching pool</p>
+                        </FloatingElement>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                        Event-day readiness
+                      </p>
+                      <MotionStagger className="mt-4 space-y-3" staggerDelay={0.1} initialDelay={0.3}>
+                        {readinessChecklist.map((item) => (
+                          <MotionStaggerItem key={item.label} className="flex items-start gap-2.5">
+                            <ClipboardCheck
+                              className="mt-0.5 size-4 shrink-0 text-status-success-fg"
+                              strokeWidth={1.75}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-body-sm font-medium text-text-primary">{item.label}</p>
+                              <p className="mt-0.5 text-body-sm text-text-secondary">{item.detail}</p>
+                            </div>
+                          </MotionStaggerItem>
+                        ))}
+                      </MotionStagger>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </div>

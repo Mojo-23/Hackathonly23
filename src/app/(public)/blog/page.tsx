@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
   ClipboardCheck,
   GraduationCap,
   Handshake,
   Lock,
+  Search,
   ShieldCheck,
   Trophy,
   Users2,
@@ -106,6 +108,18 @@ const posts = [
 ];
 
 export default function BlogPage() {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredPosts = useMemo(() => {
+    if (!normalizedQuery) return posts;
+    return posts.filter(
+      (post) =>
+        post.title.toLowerCase().includes(normalizedQuery) ||
+        post.excerpt.toLowerCase().includes(normalizedQuery) ||
+        post.category.toLowerCase().includes(normalizedQuery),
+    );
+  }, [normalizedQuery]);
+
   return (
     <div className="bg-background-default text-text-primary">
       <section className="border-b border-border-default bg-background-default">
@@ -123,13 +137,33 @@ export default function BlogPage() {
               these events, not marketing copy.
             </p>
           </MotionReveal>
+          <MotionReveal variants={fadeUpSm} delay={0.05} className="mx-auto mt-8 max-w-md">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute start-4 top-1/2 size-4 -translate-y-1/2 text-text-tertiary"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search articles"
+                aria-label="Search blog articles"
+                className="h-11 w-full rounded-pill border border-border-strong bg-background-default ps-11 pe-4 text-body-sm text-text-primary placeholder:text-text-tertiary focus-visible:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
+              />
+            </div>
+          </MotionReveal>
           <MotionStagger className="mt-8 flex flex-wrap items-center justify-center gap-2" staggerDelay={0.04}>
             {categories.map((category) => (
-              <MotionStaggerItem
-                key={category}
-                className="rounded-pill border border-border-default bg-background-sunken px-3 py-1.5 text-body-sm font-medium text-text-secondary"
-              >
-                {category}
+              <MotionStaggerItem key={category}>
+                <button
+                  type="button"
+                  onClick={() => setQuery(category)}
+                  className="rounded-pill border border-border-default bg-background-sunken px-3 py-1.5 text-body-sm font-medium text-text-secondary transition-colors duration-[var(--motion-fast)] hover:text-text-primary"
+                >
+                  {category}
+                </button>
               </MotionStaggerItem>
             ))}
           </MotionStagger>
@@ -166,8 +200,17 @@ export default function BlogPage() {
 
       <MotionSection className="border-b border-border-default bg-background-default">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <MotionStagger className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3" staggerDelay={0.06}>
-            {posts.map((post, index) => {
+          {normalizedQuery ? (
+            <p className="mb-6 text-body-sm text-text-tertiary">
+              {filteredPosts.length} result{filteredPosts.length === 1 ? "" : "s"} for &ldquo;{query}&rdquo;
+            </p>
+          ) : null}
+          <MotionStagger
+            key={normalizedQuery}
+            className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            staggerDelay={0.06}
+          >
+            {filteredPosts.map((post, index) => {
               const tone = coverTone[index % coverTone.length];
               return (
                 <MotionStaggerItem key={post.title}>
@@ -196,12 +239,26 @@ export default function BlogPage() {
               );
             })}
           </MotionStagger>
-          <MotionReveal variants={fadeUpSm} delay={0.1} className="mt-10 text-center">
-            <p className="text-body-sm text-text-tertiary">
-              More on organizer playbooks, matching mechanics, and community stories — publishing
-              through the season.
+          {filteredPosts.length === 0 ? (
+            <p className="py-10 text-center text-body-sm text-text-tertiary">
+              No articles match &ldquo;{query}&rdquo; yet — try a different word or{" "}
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="font-medium text-text-primary underline underline-offset-2 hover:text-brand"
+              >
+                clear the search
+              </button>
+              .
             </p>
-          </MotionReveal>
+          ) : (
+            <MotionReveal variants={fadeUpSm} delay={0.1} className="mt-10 text-center">
+              <p className="text-body-sm text-text-tertiary">
+                More on organizer playbooks, matching mechanics, and community stories —
+                publishing through the season.
+              </p>
+            </MotionReveal>
+          )}
         </div>
       </MotionSection>
     </div>

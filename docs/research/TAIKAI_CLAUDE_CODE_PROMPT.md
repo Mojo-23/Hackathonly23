@@ -1,5 +1,8 @@
-# Document 3 — Ready-to-Send Claude Code Prompt
-### Self-contained. Copy everything below the line into a fresh Claude Code session.
+# Document 3 — Ready-to-Send Claude Code Prompt (historical record)
+
+> **Status: executed, historical record — do not re-run.** This was a one-time execution prompt. The work it describes has been carried out, reviewed, fixed, and adopted as the official Hackathonly public design (see `handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md` for the current, authoritative record of exactly what shipped, including several decisions made *after* this prompt was written — e.g. real photography was later approved in place of the typographic-only fallback this prompt originally prescribed as the default). Kept for provenance (it shows the original execution instructions an agent was given), not as a live directive. If any instruction below conflicts with the current implementation or with `docs/DESIGN_SYSTEM.md`/`docs/MOTION_SYSTEM.md`, **the current implementation and those two documents win** — this file does not.
+
+### Self-contained. Historical: this was copy-pasted into a fresh Claude Code session at the time.
 
 ---
 

@@ -3,10 +3,9 @@ import { Button } from "@/components/ui/button";
 
 const navLinks = [
   { href: "/events", label: "Hackathons" },
-  { href: "/participants", label: "For participants" },
-  { href: "/organizers", label: "For organizers" },
+  { href: "/participants", label: "Participants" },
+  { href: "/organizers", label: "Organizers" },
   { href: "/blog", label: "Blog" },
-  { href: "/dashboard", label: "Dashboard" },
 ];
 
 export function SiteHeader() {

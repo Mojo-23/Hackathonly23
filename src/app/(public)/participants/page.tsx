@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -23,6 +24,12 @@ import { MotionCard } from "@/components/motion/motion-card";
 import { fadeIn, fadeUpSm } from "@/lib/motion/variants";
 import { duration, easing, stagger } from "@/lib/motion/tokens";
 import { useReducedMotionSafe } from "@/lib/motion/use-reduced-motion-safe";
+
+const poolAvatars = [
+  { name: "Layla H.", avatar: "/images/avatars/layla-h.jpg" },
+  { name: "Omar K.", avatar: "/images/avatars/omar-k.jpg" },
+  { name: "Sara M.", avatar: "/images/avatars/sara-m.jpg" },
+];
 
 const painPoints = [
   "I want to join, but I don't have a team.",
@@ -95,21 +102,38 @@ export default function ParticipantsPage() {
             </motion.p>
             <motion.div
               variants={heroText}
-              className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+              className="mt-8 flex flex-wrap items-center justify-center gap-3"
             >
               <Link href="/events" className={buttonVariants({ size: "lg" })}>
                 Browse events <ArrowRight className="size-4" strokeWidth={1.75} />
               </Link>
               <a
                 href="#how-it-works"
-                className="group inline-flex items-center gap-1.5 text-body-sm font-medium text-text-secondary transition-colors duration-[var(--motion-fast)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
+                className={buttonVariants({ size: "lg", variant: "secondary" })}
               >
                 See how matching works
-                <ArrowRight
-                  className="size-4 transition-transform duration-[var(--motion-fast)] group-hover:translate-x-1"
-                  strokeWidth={1.75}
-                />
               </a>
+            </motion.div>
+
+            <motion.div
+              variants={heroText}
+              className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
+            >
+              <div className="flex -space-x-3">
+                {poolAvatars.map((person) => (
+                  <Image
+                    key={person.name}
+                    src={person.avatar}
+                    alt={person.name}
+                    width={40}
+                    height={40}
+                    className="size-10 shrink-0 rounded-pill border-2 border-background-default object-cover"
+                  />
+                ))}
+              </div>
+              <p className="text-body-sm text-text-tertiary">
+                Every match starts with a real profile — never a public one.
+              </p>
             </motion.div>
           </motion.div>
         </div>

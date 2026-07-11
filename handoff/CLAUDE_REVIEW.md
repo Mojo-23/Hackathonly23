@@ -1,49 +1,72 @@
-# Claude Review — PHASE-UI-004: Organizer Landing Surface (fix-pass re-review)
+# Claude Review — Official Adoption & Repository Consolidation
 
-Reviewed as Design Director / UX reviewer / accessibility reviewer / frontend architecture reviewer. This is a fresh verdict following a narrowly-scoped fix pass that addressed the two blocking items from the prior review. No fixes implemented during this review pass, nothing committed or pushed. Only this file (and its companion, `handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md`) were written.
+Fresh, strict review of the consolidation pass described in `CLAUDE_IMPLEMENTATION_SUMMARY.md`: the four previously-approved fixes (re-verified, not re-applied), plus the official adoption of the public redesign and a full repository cleanup. This document replaces all prior `CLAUDE_REVIEW.md` content. Nothing was committed or pushed.
 
-## 1. Verdict
+## 1. Final verdict
 
 **APPROVE**
 
-Both blocking items from the prior review are fixed, verified independently against the actual file (not taken on the implementation summary's word), and the fix pass stayed exactly within its stated scope — one file touched, no motion/docs/backend/other-route changes. All four verification gates pass. The two non-blocking items from the prior review (the motion-token approval judgment call, and the project-wide spacing-scale documentation gap) remain open but were correctly left untouched, since they were explicitly out of scope for this pass.
+All four original review findings remain resolved and were independently re-verified this pass. The public experience is now correctly documented as official, not experimental. No stale active task remains. No unnecessary or orphaned files remain within the audited scope. Dashboard remains absent from public navigation by product decision. The next phase (Role-Aware Authentication and Dashboard Architecture) is documented with the exact required section title. All verification gates pass. No backend, database, auth, or package files were touched.
 
-## 2. What changed in this pass
+## 2. Confirmation the four original findings are resolved
 
-Confirmed via `git status`: the only file modified since the prior review is `src/app/(public)/organizers/page.tsx`. No motion file (`src/lib/motion/**`, `src/components/motion/**`), no doc (`docs/DESIGN_SYSTEM.md`, `docs/MOTION_SYSTEM.md`), no backend/Supabase/RLS file, and no other route was touched — exactly as instructed.
+Re-checked directly against current file contents this pass, not taken on trust from the prior summary:
 
-**Fix 1 — missing `<h2>` on the audience section.** Independently grepped the file: it now has 6 `<h2>` elements (previously 5), including one directly after the "Built for every kind of organizer" eyebrow and before the audience paragraph ("One privacy-first foundation, every kind of organizer"). Heading outline is now complete: one `<h1>`, six `<h2>`s, no skipped levels, no section without a heading.
+1. **Code hygiene** — resolved. `src/app/(public)/participants/page.tsx`: all imports grouped at the top (lines 3–26); `poolAvatars` declared immediately after, at line 28. `tsc`/`eslint` clean.
+2. **Hero switcher accessibility** — resolved. `src/app/(public)/page.tsx`: zero matches for `role="tab"|role="tablist"|aria-selected`; both view-switcher buttons are native `<button type="button">` with `aria-pressed={activeView === view}` and `focus-visible:ring-2 focus-visible:ring-brand-tint`; `AnimatePresence` crossfade and visual styling unchanged.
+3. **Public navigation** — resolved (confirmation-only task). `src/components/layout/site-header.tsx`: nav is `Hackathons (/events) / Participants / Organizers / Blog`; no `Dashboard` entry in header or footer; `Sign in`/`Sign up` remain the same pre-existing non-functional placeholders, no fake auth behavior added.
+4. **Module-rail consistency** — resolved. `src/app/(public)/organizers/page.tsx`'s module rail now uses `bg-background-inverse`/`text-inverse`, matching the landing page; grep for clay-color classes (`text-brand\b|bg-brand\b|bg-brand-tint|border-brand\b`) on that page returns zero matches — a net improvement to clay budget, not a wash.
 
-**Fix 2 — hero registration-health metric row at 375px.** Independently confirmed the class change: the row is now `grid grid-cols-1 gap-4 sm:grid-cols-3` (was `grid grid-cols-3 gap-4`). Reasoning through the layout (I still have no live browser render available, same limitation as the first review): at 375px this tile row sits inside a panel that's single-column below `md`, giving the row roughly 290px of width after gutters/borders/padding. At a fixed 3-column split that left ~87px per tile, which was too narrow for the "In matching pool" label (17 characters) to stay on one line while the other two labels did — the specific cramped/uneven-wrap defect the prior review flagged. Stacking to one column below `sm` (640px) removes the constraint entirely at 375px; the original 3-column layout is preserved at `sm` and above, where there's comfortably enough width. This is a minimal, correctly-targeted fix — a breakpoint change on one `className`, nothing else touched on the tiles (same `FloatingElement` props, same `MotionCounter`, same icons/labels/spacing scale).
+## 3. Confirmation the design is now treated as official, not experimental
 
-Both fixes are additive/adjustive only — no existing copy, motion behavior, token, or unrelated section was altered.
+- `docs/PHASES.md`'s "Design track" section states the redesign is "adopted" and that future work "evolves this implementation rather than reverting."
+- `docs/research/TAIKAI_MASTER_DESIGN_REPORT.md` and `TAIKAI_IMPLEMENTATION_BRIEF.md` each carry a new status banner marking them as reference/adopted, not live specs.
+- `docs/research/TAIKAI_CLAUDE_CODE_PROMPT.md` is retitled "(historical record)" with a "do not re-run" banner, and explicitly subordinated to the current implementation and `docs/DESIGN_SYSTEM.md`/`docs/MOTION_SYSTEM.md`.
+- Repo-wide grep for experimental-framing phrases ("experiment," "prototype-only," "temporary TAIKAI clone," "proposed direction," "test redesign," "old public design," etc.) found no remaining matches in any binding doc (`CLAUDE.md`, `docs/DESIGN_SYSTEM.md`, `docs/MOTION_SYSTEM.md`, `docs/PRODUCT_DECISIONS.md`) or in the three `docs/research/` files after this pass's edits.
+- One residual item, not a file-content issue: the git branch name `experiment/taikai-style-clone` still literally contains "experiment." See §7 (remaining technical debt) — this is a human decision (rename/merge/leave), not something a content pass can or should silently resolve.
 
-## 3. Scope discipline
+## 4. Confirmation no stale active task remains
 
-Explicitly checked against every constraint given for this pass:
-- **Redesign anything else?** No — diffed against the previous file state (via the two greps above plus a full re-read of the file) and found only the two targeted edits.
-- **Touch motion?** No — `FloatingElement`, `MotionCounter`, `MotionStagger`, `useCursorParallax`, and every token reference in the file are byte-identical to before; only the parent `<div>`'s layout classes changed.
-- **Touch docs?** No — `docs/DESIGN_SYSTEM.md` and `docs/MOTION_SYSTEM.md` are unchanged in this pass (`git status` shows them as pre-existing modifications from the earlier phase, not newly touched now).
-- **Touch backend?** No — no Supabase/database/RLS/migration/auth file appears anywhere in the change set.
-- **Touch any other route?** No — `src/app/(public)/page.tsx`, `src/app/organizer/events/[eventId]/page.tsx`, and every other route file are untouched.
+`tasks/current-task.md` re-read directly: contains only a clean "No active task" placeholder pointing to the implementation summary, with the standing one-task-at-a-time rule restated. The prior stale task (`PHASE-UI-003B`, ~159 lines, never executed as originally written) is preserved verbatim at `tasks/archive/PHASE-UI-003B.md` with an appended note explaining supersession — not deleted, not silently dropped.
 
-## 4. Verification (re-run directly, not trusted from the summary)
+## 5. Confirmation no unnecessary or orphaned files remain
 
-- `npm run build` → **passed**. `/organizers` still prerenders statically (`○`); every other route (`/`, `/events`, `/events/[slug]` ×3, `/organizer/events/[eventId]`, `/dashboard`, `/privacy`, `/terms`) still builds and prerenders exactly as before — no regressions.
+Within the audited scope (`src/app/(public)/**`, `src/components/**`, `src/lib/**`, `public/images/**`, `docs/**`, `handoff/**`, `tasks/**`):
+
+- All 6 image assets confirmed referenced (zero orphans).
+- No duplicate cover-resolution logic found; single source of truth already established (`event-cover.ts`, `theme-cover-icon.tsx`).
+- Three stale one-time handoff artifacts (`CODEX_SUMMARY.md`, `FABLE_SUMMARY.md`, `WORKFLOW_TEST.md`) moved to `handoff/archive/` with descriptive renamed filenames — verified via grep that no script or doc depends on their old paths as a pre-existing requirement (`scripts/run-codex-task.ps1` only writes/checks `CODEX_SUMMARY.md` as output of a *future* run).
+- `src/components/motion/motion-marquee.tsx` has zero current importers but was correctly **kept**, not deleted — it's a documented `docs/MOTION_SYSTEM.md` primitive reserved for a future logo/social-proof row, which is the explicit exception carved out in the instructions. This is the right call, not an oversight.
+- No route was deleted, renamed, or found orphaned. `/events` was correctly left as `/events` (nav label only reads "Hackathons," per explicit instruction not to rename the route this pass).
+
+Caveat, stated plainly rather than implied: this audit covered the directories the instructions named. It is not an exhaustive whole-repo file-by-file inventory — see §7.
+
+## 6. Confirmation Dashboard remains absent from public navigation by product decision
+
+Re-confirmed by direct inspection of `site-header.tsx` — no `/dashboard` link anywhere in public nav. `npm run build` confirms `/dashboard` still exists and builds as a route (it is unlinked from public surfaces, not deleted or broken), matching the binding decision: the route exists for future authenticated use; anonymous visitors have no path to discover it from the public site. This decision is restated verbatim (not altered) in `CLAUDE_IMPLEMENTATION_SUMMARY.md` §5.
+
+## 7. Confirmation the next phase is documented
+
+`handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md` contains a section titled exactly `## 8. Next Phase — Role-Aware Authentication and Dashboard Architecture` (verified by direct grep, not assumed). It states, matching every required point: signup/onboarding asks Participant-or-Organizer; each gets a completely separate Dashboard, not a shared component with a mode toggle; anonymous visitors never see Dashboard; authenticated nav becomes role-aware; enforcement must be server-side; DB schema/migrations/RLS/ownership modeling/route protection/redirects require a separately-approved backend phase per `CLAUDE.md`'s migration/RLS approval rule; whether one person can hold both roles is explicitly left open, not pre-decided; and no implementation assumptions were silently introduced in this UI-only pass.
+
+## 8. Exact remaining technical debt
+
+- **Git branch name**: `experiment/taikai-style-clone` still contains "experiment" in its name. `main` and this branch point to the same commit (`319ad4f`); all real redesign work exists only as uncommitted working-tree changes on this branch. This is a human decision — rename the branch, merge to `main`, or leave as-is until commit — not something resolved by this pass, and not touched per the "do not commit, do not push" constraint.
+- **Audit scope**: the hygiene audit covered the directories named in the instructions; it is not a certified zero-orphan guarantee for the entire repository (e.g., `.agents/skills/**`, `.claude/skills/**` were explicitly out of scope and left untouched even though they matched the "experiment" grep, because they're generic tooling docs unrelated to this project).
+- **No functional/behavioral debt**: no TODOs, no broken imports, no failing verification gates, no clay-budget violations, no accessibility regressions found in the audited scope.
+
+## 9. Verification results
+
+Re-ran every required command directly against the current working tree this pass:
+
+- `npm run build` → **passed**. All 14 routes generated (`/`, `/_not-found`, `/blog`, `/dashboard`, `/events`, `/events/[slug]` ×3 SSG slugs, `/organizer/events/[eventId]`, `/organizers`, `/participants`, `/privacy`, `/terms`).
 - `npx tsc --noEmit` → **passed**, zero errors.
-- `npx eslint .` → **passed**, zero errors, zero warnings.
-- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` → **passed** end-to-end: build, typecheck, lint, and the `profile_id` forbidden-string scan all report `OK`, final line `All verification steps passed.`
-- Raw-hex scan (`grep -rnE "#[0-9a-fA-F]{3,8}"`) on the page file → zero matches.
-- `profile_id` scan on the page file → zero matches.
+- `npx eslint .` → **passed**, zero errors/warnings.
+- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` → **passed** all steps (build, typecheck, lint, `profile_id` forbidden-string scan).
+- Raw-hex scan across `src/**/*.tsx` → zero matches.
+- Hotlink scan (`images.unsplash.com`, `pravatar`) across `src/` → zero matches.
+- `profile_id` repo-wide scan → matches exist only inside documentation describing the naming rule itself; zero real usages.
+- Backend/package scope scan (`git status --porcelain -- package.json package-lock.json supabase/ src/app/api/`) → empty.
+- Full `git status --porcelain` → 12 modified files, 3 deleted (moved to archive), 2 new untracked paths (`handoff/archive/`, `tasks/archive/PHASE-UI-003B.md`) — matches exactly what §2 of `CLAUDE_IMPLEMENTATION_SUMMARY.md` claims, nothing extra.
 
-## 5. Residual items (not blocking, correctly out of scope for this pass)
-
-Carried over unchanged from the first review, since this pass was explicitly limited to the two blocking items only:
-- **Motion-token approval judgment call**: whether `duration.pulse`/`duration.heroPanelDelay` needed separate human sign-off as a "global design token" change, versus falling under the motion system's own self-extension rule. Still an open question for the human, not something either the original implementation or this fix pass was authorized to resolve unilaterally.
-- **Project-wide spacing-scale documentation gap**: `DESIGN_SYSTEM.md` §F's closed spacing set doesn't list the 2px/6px/10px fine values already used identically on both the landing page and this page for icon-to-text micro-gaps. Still a tracked doc-debt note, not a defect in this page specifically, and explicitly not something this pass was asked to touch.
-
-Neither item is a defect in the current implementation; both are pre-existing and were correctly left alone under a "fix only the two blocking items" instruction.
-
-## 6. Final recommendation
-
-**Ready to commit.** Both blocking findings are closed and independently verified against the actual file, scope discipline held exactly to the instruction (one file touched, nothing else), and all four verification gates pass clean. Recommend the human resolve the one open judgment call (motion-token approval) as a quick yes/no before or alongside committing — it doesn't block the commit itself, since the tokens are already correctly used and documented, but the human's explicit sign-off closes the loop on that flagged item. No revert needed; nothing here warrants discarding any part of the work.
+This working tree is ready for human review and commit, at the human's discretion. No further action taken this pass — stopping here per the explicit closing instruction.

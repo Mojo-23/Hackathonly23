@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   ClipboardList,
   FileCheck2,
@@ -147,6 +149,39 @@ const trustPromises = [
 
 const audiences = ["Universities", "Companies", "Incubators", "Communities", "Government & innovation programs"];
 
+const faqs = [
+  {
+    question: "Can I run a hackathon for non-technical participants?",
+    answer:
+      "Yes. Tracks, team size, and matching criteria are all organizer-configured — Hackathonly doesn't assume every participant is an engineer.",
+  },
+  {
+    question: "Can I use Hackathonly for an online, in-person, or hybrid event?",
+    answer:
+      "All three. Event mode is a property of the event itself, and check-in, matching, and reporting all work the same way regardless of format.",
+  },
+  {
+    question: "What happens if my participants already have pre-formed teams?",
+    answer:
+      "Teams can register directly with an invite code instead of going through matching — contact reveal on join works the same way, no separate flow to learn.",
+  },
+  {
+    question: "How does Hackathonly actually protect participant privacy?",
+    answer:
+      "Contact reveal runs through a single audited database function, never a client-side write. Nobody — including organizers — sees a phone number or email before every proposed teammate has accepted.",
+  },
+  {
+    question: "Can sponsors see participant contact details?",
+    answer:
+      "No. Sponsor exports are built from an aggregate, PII-free snapshot, and only include participants who explicitly opted into sponsor sharing.",
+  },
+  {
+    question: "How is this different from managing everything in Forms and WhatsApp?",
+    answer:
+      "Forms and WhatsApp don't enforce consent, don't produce a report, and don't stop a contact list from leaking. Hackathonly's structure makes those the default, not something you configure correctly by hand every time.",
+  },
+];
+
 const heroText = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: duration.slow, ease: easing.entrance } },
@@ -156,6 +191,50 @@ const heroSequence = {
   hidden: {},
   visible: { transition: { staggerChildren: stagger.heroLine, delayChildren: 0.05 } },
 };
+
+function FaqAccordion() {
+  const reducedMotion = useReducedMotionSafe();
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <div className="divide-y divide-border-default border-y border-border-default">
+      {faqs.map((item, index) => {
+        const isOpen = openIndex === index;
+        return (
+          <div key={item.question}>
+            <button
+              type="button"
+              onClick={() => setOpenIndex(isOpen ? null : index)}
+              aria-expanded={isOpen}
+              className="flex w-full items-center justify-between gap-4 py-5 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
+            >
+              <span className="text-body-sm font-semibold text-text-primary">{item.question}</span>
+              <motion.span
+                animate={reducedMotion ? undefined : { rotate: isOpen ? 180 : 0 }}
+                transition={{ duration: duration.fast, ease: easing.standard }}
+              >
+                <ChevronDown className="size-4 shrink-0 text-text-tertiary" strokeWidth={1.75} />
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {isOpen ? (
+                <motion.div
+                  initial={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={reducedMotion ? undefined : { height: 0, opacity: 0 }}
+                  transition={{ duration: duration.base, ease: easing.standard }}
+                  className="overflow-hidden"
+                >
+                  <p className="max-w-2xl pb-5 text-body-sm text-text-secondary">{item.answer}</p>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function OrganizersLandingPage() {
   const reducedMotion = useReducedMotionSafe();
@@ -201,15 +280,8 @@ export default function OrganizersLandingPage() {
               >
                 See the command center <ArrowRight className="size-4" strokeWidth={1.75} />
               </Link>
-              <Link
-                href="/events"
-                className="group inline-flex items-center gap-1.5 text-body-sm font-medium text-text-secondary transition-colors duration-[var(--motion-fast)] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-tint"
-              >
+              <Link href="/events" className={buttonVariants({ size: "lg", variant: "secondary" })}>
                 Browse live events
-                <ArrowRight
-                  className="size-4 transition-transform duration-[var(--motion-fast)] group-hover:translate-x-1"
-                  strokeWidth={1.75}
-                />
               </Link>
             </motion.div>
           </motion.div>
@@ -260,8 +332,8 @@ export default function OrganizersLandingPage() {
                     key={module.label}
                     className={
                       index === 0
-                        ? "flex items-center gap-2.5 rounded-control bg-brand-tint px-3 py-2 text-body-sm font-medium text-brand"
-                        : "flex items-center gap-2.5 rounded-control px-3 py-2 text-body-sm text-text-secondary"
+                        ? "flex items-center gap-2.5 rounded-control bg-background-inverse px-3 py-2 text-body-sm font-medium text-text-inverse transition-colors duration-[var(--motion-fast)]"
+                        : "flex items-center gap-2.5 rounded-control px-3 py-2 text-body-sm text-text-secondary transition-colors duration-[var(--motion-fast)]"
                     }
                   >
                     <module.icon className="size-4 shrink-0" strokeWidth={1.75} />
@@ -482,6 +554,22 @@ export default function OrganizersLandingPage() {
               </MotionStaggerItem>
             ))}
           </MotionStagger>
+        </div>
+      </MotionSection>
+
+      <MotionSection className="border-b border-border-default bg-background-default">
+        <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24">
+          <MotionReveal variants={fadeUpSm} className="text-center">
+            <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+              FAQ
+            </p>
+            <h2 className="mt-2 text-heading-lg font-semibold text-text-primary">
+              Before you talk to us
+            </h2>
+          </MotionReveal>
+          <MotionReveal variants={fadeIn} delay={0.1} className="mt-10">
+            <FaqAccordion />
+          </MotionReveal>
         </div>
       </MotionSection>
 
