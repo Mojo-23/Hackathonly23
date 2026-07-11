@@ -1,59 +1,72 @@
-# Task Template
-
-Copy this shape into `/tasks/current-task.md` for every new task. Fill every section — an empty section is an ambiguity Codex will have to guess at, and guessing is explicitly against the rules in `AGENTS.md`.
-
----
-
 ## Task ID
-`TOOLING-001`
+`PHASE-UI-000`
 
 ## Phase reference
-Not a `/docs/PHASES.md` feature slice — this is a tooling/infra maintenance task (same category as prior workflow-maintenance tasks). No phase or design doc is affected.
+`/docs/PHASES.md` "Design track" section — tokens + fonts (declarations only) + primitives only, no page redesigns, must precede any surface-level UI work.
 
 ## Objective
-Stop ESLint from reporting warnings against installed agent-skill vendor directories (`.agents/skills/impeccable/**`, `.claude/skills/impeccable/**`) so lint output reflects only Hackathonly app source, without touching the skills themselves or any app code.
+Align the UI foundation with `docs/DESIGN_SYSTEM.md` before any page redesign.
 
-## Context
-- `scripts/verify.ps1` currently passes end-to-end, but running `npx eslint .` directly surfaces many warnings originating from `.agents/skills/impeccable/**` and `.claude/skills/impeccable/**`.
-- These directories are installed agent-skill vendor files, not Hackathonly application source, and must not be edited, linted, or removed.
-- This is a lint-configuration-only fix.
+## Required docs
+Read and follow before making any change:
+- `docs/DESIGN_SYSTEM.md`
+- `docs/PRODUCT_DECISIONS.md`
+- `docs/COMPONENTS.md`
+- `docs/PHASES.md`
 
-## In scope
-- Update ESLint configuration (e.g. `eslint.config.*` or equivalent flat-config `ignores` entry) to exclude `.agents/**` and `.claude/**` from linting.
-- Keep all existing lint behavior for `src/`, `scripts/`, `supabase/`, and any other currently-linted app paths unchanged.
-- Update `handoff/CODEX_SUMMARY.md` with the standard handoff write.
+## Allowed files
+Only these files may be touched:
+- `src/app/globals.css`
+- `src/components/ui/button.tsx`
+- `src/components/ui/card.tsx`
+- `src/components/ui/status-badge.tsx`
+- `src/components/ui/metric-card.tsx`
+- `src/components/ui/empty-state.tsx`
+- `src/components/ui/section-header.tsx`
+- `src/components/ui/skeleton.tsx`
+- `handoff/CODEX_SUMMARY.md`
 
-## Out of scope
-- Any change to `src/`.
-- Any change to `docs/`.
-- Any change to Supabase files, migrations, or tests.
-- Any change to `package.json` or `package-lock.json` unless strictly unavoidable to express the ignore rule — if so, the handoff must explain exactly why no config-only alternative existed.
-- Removing, disabling, editing, or renaming any file inside `.agents/skills/**` or `.claude/skills/**`.
-- Any UI creation or modification.
-- Any change to `docs/DESIGN_SYSTEM.md` or any other design doc.
-- Any change to `scripts/verify.ps1` or `scripts/run-codex-task.ps1`.
-- Any change to lint rules/severity for app code — this task only adds an exclusion, it does not retune existing rules.
+## Allowed work
+- Update CSS variables and semantic design tokens.
+- Update only existing primitive components listed above.
+- Keep existing page JSX unchanged.
+- Preserve existing call sites of every primitive touched.
+- Apply Sandstone Editorial: pure white background, ink text, Petra clay action accent, warm stone neutrals.
+- Use semantic tokens instead of raw hex values in TSX components.
+- Add font-family token declarations only.
+- If self-hosted fonts are needed to fully satisfy the type system, add a `TODO` comment only — do not add font files or fetch fonts over the network.
+- If a primitive named in `docs/DESIGN_SYSTEM.md` (e.g. `Badge`, `Input`) does not already exist in `src/components/ui/`, skip it and note the gap in the handoff — do not create it.
 
-## Relevant docs
-None — this is a tooling-only task with no product/architecture surface. Do not consult or edit `/docs`.
+## Forbidden
+- Do not edit any `src/app/**/page.tsx` file.
+- Do not create new primitive files.
+- Do not touch `docs/`.
+- Do not touch Supabase.
+- Do not touch `package.json` or `package-lock.json`.
+- Do not install packages.
+- Do not add font files.
+- Do not add dark mode.
+- Do not add gradients.
+- Do not add glassmorphism.
+- Do not add decorative animations.
+- Do not add random shadows.
 
 ## Approvals on record
 - [ ] Database migration approved by human — None required for this task.
 - [ ] RLS / contact-reveal logic approved by human — None required for this task.
 
-## Files expected to change
-- ESLint config file (e.g. `eslint.config.mjs`/`eslint.config.js` or equivalent, whatever currently exists in the repo).
-- `handoff/CODEX_SUMMARY.md` (standard handoff write).
-- `package.json` only if strictly unavoidable — see Out of scope.
-
-If the diff touches anything else, that is a deviation to flag, not a silent addition.
+Font *binary asset* addition is explicitly NOT approved in this task — declarations/fallback stacks only.
 
 ## Acceptance criteria
-- [ ] `npx eslint .` no longer reports any warnings or errors originating from `.agents/**` or `.claude/**`.
-- [ ] `npx eslint .` still lints app source (`src/`, `scripts/`, etc.) exactly as before — no new suppressions beyond the vendor-skill exclusion.
-- [ ] No file inside `.agents/skills/**` or `.claude/skills/**` is modified, renamed, or deleted.
-- [ ] `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` passes (all steps).
-- [ ] `git diff` is limited to ESLint config (+ `handoff/CODEX_SUMMARY.md`), with `package.json` touched only if justified in the handoff.
+- [ ] `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` passes.
+- [ ] `git diff` is limited to the allowed files list above.
+- [ ] No page files changed.
+- [ ] No docs changed.
+- [ ] No Supabase files changed.
+- [ ] No package files changed.
+- [ ] No new primitive files created.
+- [ ] No raw hex value appears inside any touched `.tsx` component — colors route through semantic tokens.
+- [ ] Clay/brand accent used only for action emphasis, not as background wallpaper.
 - [ ] Codex writes `handoff/CODEX_SUMMARY.md`.
 
 ## Constraints (standing, copied from AGENTS.md — do not remove)
@@ -62,14 +75,18 @@ If the diff touches anything else, that is a deviation to flag, not a silent add
 - No AI winner selection, no public negative scoring.
 - No sponsor access to raw participant data without explicit opt-in.
 - No new dependencies unless explicitly listed above (none are).
-- `/docs` is read-only unless this task says otherwise (it does not).
+- `/docs` is read-only for this task.
 
 ## Verification steps
-1. `npx eslint .` — confirm zero output referencing `.agents/**` or `.claude/**`.
-2. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` — must pass.
+1. `npm run build`
+2. `npx tsc --noEmit`
+3. `npx eslint .`
+4. `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1`
 
 ## Handoff notes expected
-- Quote the exact ESLint config change (ignore pattern(s) added).
-- Confirm explicitly that no file under `.agents/skills/**` or `.claude/skills/**` was touched.
-- If `package.json` needed any change, explain precisely why a config-only exclusion was insufficient.
-- Confirm `npx eslint .` output before/after (warning count from vendor dirs going to zero; app-path warning/error count unchanged).
+- List every semantic token added/changed in `globals.css`, old value → new value where changed.
+- Confirm no raw hex value was introduced in any touched primitive.
+- Quote the clay/brand accent usage sites in the updated primitives.
+- State whether font self-hosting is needed, and confirm only a `TODO` comment was added, not a workaround.
+- Confirm no `src/app/**/page.tsx` file appears in the diff.
+- Note any `DESIGN_SYSTEM.md`-described primitive that doesn't exist yet and was correctly skipped.
