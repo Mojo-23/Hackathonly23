@@ -1,15 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, Trophy } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EventFactsStrip } from "@/components/events/event-facts-strip";
+import { ThemeCoverIcon } from "@/components/events/theme-cover-icon";
 import { MotionReveal } from "@/components/motion/motion-reveal";
 import { MotionSection } from "@/components/motion/motion-section";
 import { MotionStagger, MotionStaggerItem } from "@/components/motion/motion-stagger";
 import { fadeIn, fadeUpSm, scaleIn } from "@/lib/motion/variants";
+import { coverPhotoBySlug, getCoverTone } from "@/lib/event-cover";
 import type { Hackathon } from "@/types/domain";
 
 function getEventMark(title: string) {
@@ -30,6 +33,9 @@ function formatDate(value: string) {
 }
 
 export function EventDetailContent({ hackathon }: { hackathon: Hackathon }) {
+  const coverPhoto = coverPhotoBySlug[hackathon.slug];
+  const tone = coverPhoto ? null : getCoverTone(hackathon.id);
+
   return (
     <div className="bg-background-default pb-24 text-text-primary sm:pb-0">
       <section className="border-b border-border-default bg-background-default">
@@ -67,52 +73,80 @@ export function EventDetailContent({ hackathon }: { hackathon: Hackathon }) {
             <MotionReveal
               variants={scaleIn}
               delay={0.15}
-              className="relative overflow-hidden rounded-card border border-border-default bg-background-sunken p-6 sm:p-8"
+              className="overflow-hidden rounded-card border border-border-default"
             >
-              <span
-                className="absolute start-4 top-4 size-8 border-s border-t border-text-primary"
-                aria-hidden="true"
-              />
-              <span
-                className="absolute bottom-4 end-4 size-8 border-b border-e border-text-primary"
-                aria-hidden="true"
-              />
-              <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                Event identity
-              </p>
-              <p className="mt-8 font-display text-display-lg font-semibold text-text-primary">
-                {getEventMark(hackathon.title)}
-              </p>
-              <dl className="mt-8 grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    Theme
-                  </dt>
-                  <dd className="mt-1 text-body-sm font-medium text-text-primary">{hackathon.theme}</dd>
+              <div
+                className={`relative flex aspect-video flex-col justify-between p-5 ${tone ? tone.wrapper : ""}`}
+              >
+                {coverPhoto ? (
+                  <>
+                    <Image
+                      src={coverPhoto}
+                      alt=""
+                      fill
+                      sizes="(min-width: 1024px) 33vw, 100vw"
+                      className="object-cover"
+                    />
+                    <div
+                      className="absolute inset-0 bg-gradient-to-t from-background-inverse/85 via-background-inverse/10 to-transparent"
+                      aria-hidden="true"
+                    />
+                  </>
+                ) : (
+                  <ThemeCoverIcon
+                    theme={hackathon.theme}
+                    className={`absolute -bottom-6 -end-6 size-32 ${tone!.icon}`}
+                  />
+                )}
+                <span
+                  className={`relative size-8 border-s border-t ${coverPhoto ? "border-text-inverse/50" : tone!.corner}`}
+                  aria-hidden="true"
+                />
+                <div className="relative flex items-end justify-between gap-4">
+                  <p className={`font-display text-display-lg font-semibold ${coverPhoto ? "text-text-inverse" : tone!.mark}`}>
+                    {getEventMark(hackathon.title)}
+                  </p>
+                  <span
+                    className={`mb-1 size-6 shrink-0 border-b border-e ${coverPhoto ? "border-text-inverse/50" : tone!.corner}`}
+                    aria-hidden="true"
+                  />
                 </div>
-                <div>
-                  <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    City
-                  </dt>
-                  <dd className="mt-1 text-body-sm font-medium text-text-primary">{hackathon.city}</dd>
-                </div>
-                <div>
-                  <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    Teams
-                  </dt>
-                  <dd className="mt-1 text-body-sm font-medium text-text-primary">
-                    {hackathon.teamSizeMin}-{hackathon.teamSizeMax}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                    Register by
-                  </dt>
-                  <dd className="mt-1 text-body-sm font-medium text-text-primary">
-                    {formatDate(hackathon.registrationClosesAt)}
-                  </dd>
-                </div>
-              </dl>
+              </div>
+              <div className="bg-background-sunken p-6 sm:p-8">
+                <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                  Event identity
+                </p>
+                <dl className="mt-6 grid grid-cols-2 gap-4">
+                  <div>
+                    <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                      Theme
+                    </dt>
+                    <dd className="mt-1 text-body-sm font-medium text-text-primary">{hackathon.theme}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                      City
+                    </dt>
+                    <dd className="mt-1 text-body-sm font-medium text-text-primary">{hackathon.city}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                      Teams
+                    </dt>
+                    <dd className="mt-1 text-body-sm font-medium text-text-primary">
+                      {hackathon.teamSizeMin}-{hackathon.teamSizeMax}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                      Register by
+                    </dt>
+                    <dd className="mt-1 text-body-sm font-medium text-text-primary">
+                      {formatDate(hackathon.registrationClosesAt)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             </MotionReveal>
           </div>
         </div>

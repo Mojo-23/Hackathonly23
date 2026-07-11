@@ -1,17 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  CalendarDays,
-  Cpu,
-  Leaf,
-  MapPin,
-  Radar,
-  Users,
-  Wallet,
-  Wrench,
-} from "lucide-react";
+import { ArrowUpRight, CalendarDays, MapPin, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ThemeCoverIcon } from "@/components/events/theme-cover-icon";
+import { coverPhotoBySlug, getCoverTone } from "@/lib/event-cover";
 import type { Hackathon } from "@/types/domain";
 
 const modeLabel: Record<Hackathon["mode"], string> = {
@@ -19,45 +12,6 @@ const modeLabel: Record<Hackathon["mode"], string> = {
   online: "Online",
   hybrid: "Hybrid",
 };
-
-// Placeholder/demo cover photography, hotlinked from Unsplash's CDN
-// (images.unsplash.com, direct verified photo IDs — no API key required).
-// This is a deliberate, explicitly-requested exception to
-// docs/DESIGN_SYSTEM.md §C/§K ("no stock photography, system-generated
-// covers only") — flagged in handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md as an
-// open item, since real Hackathonly event photography doesn't exist yet.
-// Assigned per event by index (not by exact visual subject match — image
-// content couldn't be verified visually before use), so each card gets a
-// distinct, stable photo.
-const coverPhotoIds = [
-  "1550439062-609e1531270e",
-  "1519389950473-47ba0277781c",
-  "1497366216548-37526070297c",
-  "1518770660439-4636190af475",
-];
-
-function getCoverPhotoUrl(id: string) {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) hash += id.charCodeAt(i);
-  const photoId = coverPhotoIds[hash % coverPhotoIds.length];
-  return `https://images.unsplash.com/photo-${photoId}?w=800&h=450&fit=crop&auto=format&q=80`;
-}
-
-// Small thematic badge layered over the photo — since the underlying stock
-// photo's exact subject isn't guaranteed to match the event's theme, this
-// icon+label chip is what actually and reliably communicates "AI" / "FinTech"
-// / "Sustainability" / etc. at a glance.
-const themeIcon: { match: RegExp; icon: typeof Cpu }[] = [
-  { match: /ai|intelligen/i, icon: Cpu },
-  { match: /fintech|financ|payment/i, icon: Wallet },
-  { match: /sustain|water|energy|climate/i, icon: Leaf },
-  { match: /hardware|iot|robot/i, icon: Wrench },
-];
-
-function ThemeCoverIcon({ theme, className }: { theme: string; className: string }) {
-  const Icon = themeIcon.find((entry) => entry.match.test(theme))?.icon ?? Radar;
-  return <Icon className={className} strokeWidth={1.75} aria-hidden="true" />;
-}
 
 function formatDateRange(startsAt: string, endsAt: string) {
   const start = new Date(startsAt);
@@ -76,38 +30,60 @@ function getEventMark(title: string) {
 }
 
 export function EventCard({ hackathon }: { hackathon: Hackathon }) {
+  const coverPhoto = coverPhotoBySlug[hackathon.slug];
+  const tone = coverPhoto ? null : getCoverTone(hackathon.id);
+
   return (
     <Link href={`/events/${hackathon.slug}`} className="group block h-full focus-visible:outline-none">
       <Card className="flex h-full flex-col overflow-hidden transition-[border-color,box-shadow] duration-[var(--motion-fast)] group-hover:border-border-strong group-hover:shadow-raised group-focus-visible:border-brand group-focus-visible:ring-2 group-focus-visible:ring-brand-tint group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background-default">
-        <div className="relative flex aspect-video flex-col justify-between overflow-hidden border-b border-border-default bg-background-sunken p-4">
-          {/* eslint-disable-next-line @next/next/no-img-element -- external hotlinked placeholder photo, next/image would require a next.config remotePatterns change out of this task's scope */}
-          <img
-            src={getCoverPhotoUrl(hackathon.id)}
-            alt=""
-            loading="lazy"
-            className="absolute inset-0 size-full object-cover transition-transform duration-[var(--motion-slow)] ease-out motion-safe:group-hover:scale-105"
-          />
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-background-inverse/85 via-background-inverse/10 to-transparent"
+        <div
+          className={`relative flex aspect-video flex-col justify-between overflow-hidden border-b border-border-default p-4 ${tone ? tone.wrapper : "bg-background-sunken"}`}
+        >
+          {coverPhoto ? (
+            <>
+              <Image
+                src={coverPhoto}
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                className="object-cover transition-transform duration-[var(--motion-slow)] ease-out motion-safe:group-hover:scale-105"
+              />
+              <div
+                className="absolute inset-0 bg-gradient-to-t from-background-inverse/85 via-background-inverse/10 to-transparent"
+                aria-hidden="true"
+              />
+            </>
+          ) : (
+            <ThemeCoverIcon
+              theme={hackathon.theme}
+              className={`absolute -bottom-6 -end-6 size-32 ${tone!.icon}`}
+            />
+          )}
+          <span
+            className={`absolute start-4 top-4 size-6 border-s border-t ${coverPhoto ? "border-text-inverse/50" : tone!.corner}`}
             aria-hidden="true"
           />
           <span
-            className="absolute start-4 top-4 size-6 border-s border-t border-text-inverse/50"
+            className={`absolute bottom-4 end-4 size-6 border-b border-e ${coverPhoto ? "border-text-inverse/50" : tone!.corner}`}
             aria-hidden="true"
           />
           <span
-            className="absolute bottom-4 end-4 size-6 border-b border-e border-text-inverse/50"
-            aria-hidden="true"
-          />
-          <span className="relative inline-flex w-fit items-center gap-1.5 rounded-pill bg-background-inverse/70 px-2.5 py-1 text-label font-medium uppercase tracking-label text-text-inverse">
+            className={`relative inline-flex w-fit items-center gap-1.5 rounded-pill px-2.5 py-1 text-label font-medium uppercase tracking-label ${
+              coverPhoto
+                ? "bg-background-inverse/70 text-text-inverse"
+                : `bg-background-default/80 ${tone!.eyebrow}`
+            }`}
+          >
             <ThemeCoverIcon theme={hackathon.theme} className="size-3.5" />
             {hackathon.theme}
           </span>
           <div className="relative flex items-end justify-between gap-4">
-            <p className="font-display text-display-lg font-semibold text-text-inverse">
+            <p className={`font-display text-display-lg font-semibold ${coverPhoto ? "text-text-inverse" : tone!.mark}`}>
               {getEventMark(hackathon.title)}
             </p>
-            <p className="text-label font-medium uppercase tracking-label text-text-inverse/80">
+            <p
+              className={`text-label font-medium uppercase tracking-label ${coverPhoto ? "text-text-inverse/80" : tone!.eyebrow}`}
+            >
               {modeLabel[hackathon.mode]}
             </p>
           </div>

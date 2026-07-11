@@ -507,6 +507,13 @@ export default function OrganizersLandingPage() {
               Browse live events
             </Link>
           </div>
+          <Link
+            href="/participants"
+            className="mt-6 inline-flex items-center gap-1.5 text-body-sm font-medium text-text-inverse/70 transition-colors duration-[var(--motion-fast)] hover:text-text-inverse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-inverse/40"
+          >
+            Looking for a team instead?
+            <ArrowRight className="size-4" strokeWidth={1.75} />
+          </Link>
         </div>
       </MotionSection>
     </div>

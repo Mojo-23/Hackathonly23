@@ -10,12 +10,18 @@ export function SiteFooter() {
             The event intelligence operating system for Jordanian hackathons.
           </p>
         </div>
-        <div className="flex gap-6 text-sm text-ink-muted">
+        <div className="flex flex-wrap gap-6 text-sm text-ink-muted">
           <Link href="/events" className="hover:text-ink">
-            Events
+            Hackathons
+          </Link>
+          <Link href="/participants" className="hover:text-ink">
+            Participants
           </Link>
           <Link href="/organizers" className="hover:text-ink">
             Organizers
+          </Link>
+          <Link href="/blog" className="hover:text-ink">
+            Blog
           </Link>
           <Link href="/privacy" className="hover:text-ink">
             Privacy

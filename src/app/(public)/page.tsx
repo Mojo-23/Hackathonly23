@@ -1,27 +1,30 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
   Building2,
-  CheckCircle2,
   ClipboardCheck,
+  ClipboardList,
   FileCheck2,
+  FolderGit2,
+  Gavel,
   GraduationCap,
   Handshake,
-  Lock,
+  Info,
   QrCode,
   Radar,
   ShieldCheck,
   Trophy,
-  UserCheck,
   Users,
+  Users2,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { EventCard } from "@/components/events/event-card";
-import { commandCenterMetrics, hackathons } from "@/lib/mock-data";
+import { commandCenterMetrics, commandCenterWarnings, hackathons, myProposals } from "@/lib/mock-data";
 import { MotionReveal } from "@/components/motion/motion-reveal";
 import { MotionSection } from "@/components/motion/motion-section";
 import { MotionStagger, MotionStaggerItem } from "@/components/motion/motion-stagger";
@@ -33,14 +36,22 @@ import { duration, easing, stagger } from "@/lib/motion/tokens";
 import { useCursorParallax } from "@/lib/motion/use-cursor-parallax";
 import { useReducedMotionSafe } from "@/lib/motion/use-reduced-motion-safe";
 
-// Placeholder/demo headshots via pravatar.cc (purpose-built for exactly this
-// use — stable, realistic, license-free placeholder portraits). A deliberate,
-// explicitly-requested exception to docs/DESIGN_SYSTEM.md §C/§K's no-stock-
-// photography rule; see handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md.
+// Curated, locally-stored placeholder headshots (public/images/avatars/),
+// approved by explicit human decision. Source and license for every file are
+// recorded in public/images/SOURCE.md. Never hotlinked.
 const previewQueue = [
-  { name: "Layla H.", role: "Frontend", skill: "React / Design systems", status: "success" as const, avatar: "https://i.pravatar.cc/96?img=47" },
-  { name: "Omar K.", role: "ML engineer", skill: "PyTorch / NLP", status: "success" as const, avatar: "https://i.pravatar.cc/96?img=12" },
-  { name: "Sara M.", role: "Product", skill: "Research / Pitch", status: "pending" as const, avatar: "https://i.pravatar.cc/96?img=25" },
+  { name: "Layla H.", role: "Frontend", skill: "React / Design systems", status: "success" as const, avatar: "/images/avatars/layla-h.jpg" },
+  { name: "Omar K.", role: "ML engineer", skill: "PyTorch / NLP", status: "success" as const, avatar: "/images/avatars/omar-k.jpg" },
+  { name: "Sara M.", role: "Product", skill: "Research / Pitch", status: "pending" as const, avatar: "/images/avatars/sara-m.jpg" },
+];
+
+const modules = [
+  { icon: ClipboardCheck, label: "Registration" },
+  { icon: Handshake, label: "Matching" },
+  { icon: QrCode, label: "Check-in" },
+  { icon: FolderGit2, label: "Submissions" },
+  { icon: Gavel, label: "Judging" },
+  { icon: Trophy, label: "Reports" },
 ];
 
 const previewStats = [
@@ -50,39 +61,12 @@ const previewStats = [
   { icon: FileCheck2, label: "Sponsor opt-ins", value: commandCenterMetrics.sponsorOptInCount },
 ];
 
-const previewFeed = [
-  { icon: CheckCircle2, tone: "success" as const, text: "Team proposal accepted — 4 of 4 members confirmed" },
-  { icon: AlertTriangle, tone: "warning" as const, text: "6 proposals expire within 24 hours" },
-  { icon: Lock, tone: "info" as const, text: "Contact details stay locked until full team acceptance" },
-];
+const proposal = myProposals[0];
 
-const participantPromises = [
-  {
-    icon: UserCheck,
-    title: "A serious profile, not a public listing",
-    text: "Your role, skills, and availability help this event form stronger teams — visible only inside that event's pool.",
-  },
-  {
-    icon: Handshake,
-    title: "Every proposal needs consent",
-    text: "Accept or decline a proposed team. A decline never exposes who blocked the match.",
-  },
-  {
-    icon: Lock,
-    title: "Contact reveal is earned",
-    text: "Phone, email, and WhatsApp stay locked until every proposed teammate accepts.",
-  },
-];
-
-const organizerModules = [
-  "Applications",
-  "Matching pool",
-  "Proposals",
-  "QR check-in",
-  "Submissions",
-  "Judging",
-  "Mentor requests",
-  "Sponsor reports",
+const guarantees = [
+  { value: "1", label: "audited RPC controls every contact reveal — never a client-side write" },
+  { value: "0", label: "public profiles. Nobody is ever indexed or browsable outside their own event" },
+  { value: "100%", label: "of consent versioned before a team is even proposed" },
 ];
 
 const lifecycle = [
@@ -113,6 +97,50 @@ const lifecycle = [
   },
 ];
 
+const warningIcon = {
+  info: { icon: Info, className: "text-status-info-fg" },
+  warning: { icon: AlertTriangle, className: "text-status-warning-fg" },
+  danger: { icon: AlertTriangle, className: "text-status-error-fg" },
+} as const;
+
+const productSurfaces = [
+  {
+    icon: ClipboardList,
+    label: "Registration health",
+    metric: commandCenterMetrics.accepted,
+    caption: `${commandCenterMetrics.accepted} of ${commandCenterMetrics.registrations} applicants accepted`,
+    span: true,
+  },
+  {
+    icon: Users2,
+    label: "Matching queue",
+    metric: commandCenterMetrics.proposalsPending,
+    caption: `${commandCenterMetrics.proposalsApproved} proposals approved, ${commandCenterMetrics.proposalsPending} awaiting response`,
+  },
+  {
+    icon: QrCode,
+    label: "Check-in status",
+    caption: "Check-in opens on event day — 0 scanned so far",
+  },
+  {
+    icon: FolderGit2,
+    label: "Submission progress",
+    caption: "Opens once team formation closes",
+  },
+  {
+    icon: Gavel,
+    label: "Judging readiness",
+    caption: "Criteria and judges confirmed — scoring opens after submissions close",
+  },
+  {
+    icon: ShieldCheck,
+    label: "Sponsor-consented reporting",
+    metric: commandCenterMetrics.sponsorOptInCount,
+    caption: `${commandCenterMetrics.sponsorOptInCount} participants opted in — only they appear in sponsor exports`,
+    span: true,
+  },
+];
+
 const heroText = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: duration.slow, ease: easing.entrance } },
@@ -121,12 +149,6 @@ const heroText = {
 const heroSequence = {
   hidden: {},
   visible: { transition: { staggerChildren: stagger.heroLine, delayChildren: 0.05 } },
-};
-
-const statusPillClass: Record<"success" | "warning" | "info", string> = {
-  success: "text-status-success-fg",
-  warning: "text-status-warning-fg",
-  info: "text-status-info-fg",
 };
 
 export default function LandingPage() {
@@ -185,11 +207,11 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div
-            className="mx-auto mt-20 max-w-5xl overflow-hidden rounded-overlay border border-border-strong bg-background-default shadow-overlay"
+            className="mx-auto mt-20 max-w-6xl overflow-hidden rounded-overlay border border-border-strong bg-background-default shadow-overlay"
             initial="hidden"
             animate="visible"
             variants={scaleIn}
-            transition={{ delay: 0.35 }}
+            transition={{ delay: duration.heroPanelDelay }}
             style={reducedMotion ? undefined : { x: parallax.x, y: parallax.y }}
             onPointerMove={parallax.onPointerMove}
             onPointerLeave={parallax.onPointerLeave}
@@ -214,84 +236,127 @@ export default function LandingPage() {
                   aria-hidden="true"
                   animate={reducedMotion ? undefined : { opacity: [1, 0.4, 1] }}
                   transition={
-                    reducedMotion ? undefined : { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                    reducedMotion ? undefined : { duration: duration.pulse, repeat: Infinity, ease: "easeInOut" }
                   }
                 />
                 Live
               </span>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr]">
-              <div className="border-b border-border-default p-6 lg:border-b-0 lg:border-e">
-                <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
-                  Team formation queue
-                </p>
-                <MotionStagger className="mt-4 space-y-3" staggerDelay={0.1} initialDelay={0.6}>
-                  {previewQueue.map((person) => (
-                    <MotionStaggerItem
-                      key={person.name}
-                      className="flex items-center gap-3 rounded-card border border-border-default bg-background-sunken p-3"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- external hotlinked placeholder photo, next/image would require a next.config remotePatterns change out of this task's scope */}
-                      <img
-                        src={person.avatar}
-                        alt={person.name}
-                        loading="lazy"
-                        className="size-11 shrink-0 rounded-pill border border-border-strong object-cover"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-body-sm font-semibold text-text-primary">
-                          {person.name}
-                        </p>
-                        <p className="truncate text-body-sm text-text-secondary">
-                          {person.role} · {person.skill}
-                        </p>
-                      </div>
-                      <span
-                        className={
-                          person.status === "success"
-                            ? "shrink-0 rounded-pill bg-status-success-tint px-2.5 py-1 text-label font-medium text-status-success-fg"
-                            : "shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg"
-                        }
-                      >
-                        {person.status === "success" ? "Accepted" : "Pending"}
-                      </span>
-                    </MotionStaggerItem>
-                  ))}
-                </MotionStagger>
-
-                <p className="mt-5 text-label font-medium uppercase tracking-label text-text-tertiary">
-                  Live signals
-                </p>
-                <MotionStagger className="mt-3 space-y-2.5" staggerDelay={0.1} initialDelay={0.9}>
-                  {previewFeed.map((item) => (
-                    <MotionStaggerItem key={item.text} className="flex items-start gap-2.5">
-                      <item.icon
-                        className={`mt-0.5 size-4 shrink-0 ${statusPillClass[item.tone]}`}
-                        strokeWidth={1.75}
-                      />
-                      <p className="text-body-sm text-text-secondary">{item.text}</p>
-                    </MotionStaggerItem>
-                  ))}
-                </MotionStagger>
+            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr]">
+              <div className="hidden flex-col gap-1 border-e border-border-default bg-background-sunken p-3 lg:flex">
+                {modules.map((module, index) => (
+                  <div
+                    key={module.label}
+                    className={
+                      index === 1
+                        ? "flex items-center gap-2.5 rounded-control bg-brand-tint px-3 py-2 text-body-sm font-medium text-brand"
+                        : "flex items-center gap-2.5 rounded-control px-3 py-2 text-body-sm text-text-secondary"
+                    }
+                  >
+                    <module.icon className="size-4 shrink-0" strokeWidth={1.75} />
+                    {module.label}
+                  </div>
+                ))}
               </div>
 
-              <div className="grid grid-cols-2 divide-x divide-border-default border-t border-border-default lg:divide-y-0 lg:border-t-0">
-                {previewStats.map((stat, index) => (
-                  <FloatingElement
-                    key={stat.label}
-                    className={index >= 2 ? "border-t border-border-default p-5" : "p-5"}
-                    distance={4}
-                    loopDuration={9 + index}
-                    delay={index * 0.4}
-                  >
-                    <stat.icon className="size-4 text-text-tertiary" strokeWidth={1.75} />
-                    <p className="mt-4 text-metric font-semibold tabular-nums text-text-primary">
-                      <MotionCounter value={stat.value} />
-                    </p>
-                    <p className="mt-1 text-body-sm text-text-secondary">{stat.label}</p>
-                  </FloatingElement>
-                ))}
+              <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr]">
+                <div className="border-b border-border-default p-6 lg:border-b-0 lg:border-e">
+                  <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                    Team formation queue
+                  </p>
+                  <MotionStagger className="mt-4 space-y-3" staggerDelay={0.1} initialDelay={0.6}>
+                    {previewQueue.map((person) => (
+                      <MotionStaggerItem
+                        key={person.name}
+                        className="flex items-center gap-3 rounded-card border border-border-default bg-background-sunken p-3"
+                      >
+                        <Image
+                          src={person.avatar}
+                          alt={person.name}
+                          width={44}
+                          height={44}
+                          className="size-11 shrink-0 rounded-pill border border-border-strong object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-body-sm font-semibold text-text-primary">
+                            {person.name}
+                          </p>
+                          <p className="truncate text-body-sm text-text-secondary">
+                            {person.role} · {person.skill}
+                          </p>
+                        </div>
+                        <span
+                          className={
+                            person.status === "success"
+                              ? "shrink-0 rounded-pill bg-status-success-tint px-2.5 py-1 text-label font-medium text-status-success-fg"
+                              : "shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg"
+                          }
+                        >
+                          {person.status === "success" ? "Accepted" : "Pending"}
+                        </span>
+                      </MotionStaggerItem>
+                    ))}
+                  </MotionStagger>
+
+                  {proposal ? (
+                    <MotionReveal variants={fadeUpSm} delay={0.9} className="mt-5">
+                      <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+                        Your proposal
+                      </p>
+                      <div className="mt-3 rounded-card border border-border-default bg-background-sunken p-3.5">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-body-sm font-semibold text-text-primary">
+                            {proposal.hackathonTitle}
+                          </p>
+                          <span className="shrink-0 rounded-pill bg-status-warning-tint px-2.5 py-1 text-label font-medium text-status-warning-fg">
+                            Expires in {proposal.expiresInHours}h
+                          </span>
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-pill bg-border-default">
+                          <motion.div
+                            className="h-full rounded-pill bg-status-success-fg"
+                            initial={reducedMotion ? undefined : { scaleX: 0 }}
+                            whileInView={
+                              reducedMotion
+                                ? undefined
+                                : { scaleX: proposal.membersAccepted / proposal.membersTotal }
+                            }
+                            viewport={{ once: true }}
+                            style={{
+                              transformOrigin: "left",
+                              scaleX: reducedMotion
+                                ? proposal.membersAccepted / proposal.membersTotal
+                                : undefined,
+                            }}
+                            transition={{ duration: duration.slow, ease: easing.standard, delay: 1 }}
+                          />
+                        </div>
+                        <p className="mt-2 text-body-sm text-text-secondary">
+                          {proposal.membersAccepted} of {proposal.membersTotal} teammates accepted
+                        </p>
+                      </div>
+                    </MotionReveal>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-2 divide-x divide-border-default border-t border-border-default lg:divide-y-0 lg:border-t-0">
+                  {previewStats.map((stat, index) => (
+                    <FloatingElement
+                      key={stat.label}
+                      className={index >= 2 ? "border-t border-border-default p-5" : "p-5"}
+                      distance={4}
+                      loopDuration={duration.ambient + index}
+                      delay={index * 0.4}
+                    >
+                      <stat.icon className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                      <p className="mt-4 text-metric font-semibold tabular-nums text-text-primary">
+                        <MotionCounter value={stat.value} />
+                      </p>
+                      <p className="mt-1 text-body-sm text-text-secondary">{stat.label}</p>
+                    </FloatingElement>
+                  ))}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -299,6 +364,24 @@ export default function LandingPage() {
       </section>
 
       <MotionSection className="border-b border-border-default bg-background-default">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <MotionStagger
+            className="grid grid-cols-1 gap-x-8 gap-y-10 sm:grid-cols-3"
+            staggerDelay={0.1}
+          >
+            {guarantees.map((item) => (
+              <MotionStaggerItem key={item.label}>
+                <p className="font-display text-display-lg font-semibold text-text-primary">
+                  {item.value}
+                </p>
+                <p className="mt-2 max-w-xs text-body-sm text-text-secondary">{item.label}</p>
+              </MotionStaggerItem>
+            ))}
+          </MotionStagger>
+        </div>
+      </MotionSection>
+
+      <MotionSection className="border-b border-border-default bg-background-sunken">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <MotionReveal variants={fadeUpSm}>
@@ -335,74 +418,118 @@ export default function LandingPage() {
       </MotionSection>
 
       <MotionSection className="border-b border-border-default bg-background-default">
-        <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-28">
-          <MotionReveal variants={fadeIn}>
-            <p className="font-display text-heading-lg font-medium leading-snug text-text-primary text-balance sm:text-display-lg">
-              No public marketplace. No cold DMs. No contact shared until
-              everyone says yes.
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <MotionReveal variants={fadeUpSm} className="max-w-2xl">
+            <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+              What organizers actually see
             </p>
+            <h2 className="mt-2 text-heading-lg font-semibold text-text-primary">
+              Every stage, one system — not a raw admin table
+            </h2>
           </MotionReveal>
+          <MotionStagger
+            className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
+            staggerDelay={stagger.item}
+          >
+            {productSurfaces.map((surface) => (
+              <MotionStaggerItem
+                key={surface.label}
+                className={surface.span ? "sm:col-span-2" : undefined}
+              >
+                <MotionCard className="h-full">
+                  <div className="h-full rounded-card border border-border-default bg-background-sunken p-5">
+                    <surface.icon className="size-4 text-text-tertiary" strokeWidth={1.75} />
+                    <p className="mt-4 text-label font-medium uppercase tracking-label text-text-tertiary">
+                      {surface.label}
+                    </p>
+                    {surface.metric !== undefined ? (
+                      <p className="mt-1 text-metric font-semibold tabular-nums text-text-primary">
+                        <MotionCounter value={surface.metric} />
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-body-sm text-text-secondary">{surface.caption}</p>
+                  </div>
+                </MotionCard>
+              </MotionStaggerItem>
+            ))}
+            <MotionStaggerItem className="sm:col-span-2 lg:col-span-4">
+              <div className="rounded-card border border-border-default bg-background-inverse p-5">
+                <p className="text-label font-medium uppercase tracking-label text-text-inverse/70">
+                  Warnings feed
+                </p>
+                <div className="mt-3 divide-y divide-text-inverse/10">
+                  {commandCenterWarnings.map((warning) => {
+                    const style = warningIcon[warning.severity];
+                    return (
+                      <div key={warning.id} className="flex items-start gap-2.5 py-2.5 first:pt-0 last:pb-0">
+                        <style.icon className={`mt-0.5 size-4 shrink-0 ${style.className}`} strokeWidth={1.75} />
+                        <p className="text-body-sm text-text-inverse/80">{warning.message}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </MotionStaggerItem>
+          </MotionStagger>
         </div>
       </MotionSection>
 
       <MotionSection className="border-b border-border-default bg-background-sunken">
-        <div className="mx-auto grid max-w-6xl gap-6 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
-          <MotionReveal
-            variants={fadeUpSm}
-            className="rounded-overlay border border-border-default bg-background-default p-6 sm:p-8"
-          >
-            <span className="flex size-11 items-center justify-center rounded-control bg-background-sunken text-text-primary">
-              <GraduationCap className="size-5" strokeWidth={1.75} />
-            </span>
-            <h2 className="mt-5 text-heading-lg font-semibold text-text-primary">
-              For participants: real teammates, not a directory
-            </h2>
-            <p className="mt-3 max-w-md text-body-sm text-text-secondary">
-              Matching is opted-in and event-scoped. There is no public people browser, no cold
-              outreach, and no public contact reveal — ever.
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+          <MotionReveal variants={fadeUpSm} className="max-w-2xl">
+            <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+              Two ways in
             </p>
-            <MotionStagger className="mt-6 space-y-4 border-t border-border-default pt-6" staggerDelay={0.08}>
-              {participantPromises.map((promise) => (
-                <MotionStaggerItem key={promise.title} className="flex gap-3">
-                  <promise.icon className="mt-0.5 size-4 shrink-0 text-text-tertiary" strokeWidth={1.75} />
-                  <div>
-                    <p className="text-body-sm font-semibold text-text-primary">{promise.title}</p>
-                    <p className="mt-0.5 text-body-sm text-text-secondary">{promise.text}</p>
-                  </div>
-                </MotionStaggerItem>
-              ))}
-            </MotionStagger>
+            <h2 className="mt-2 text-heading-lg font-semibold text-text-primary">
+              Whichever side of the event you&apos;re on, this is built for you specifically
+            </h2>
           </MotionReveal>
-
-          <MotionReveal
-            variants={fadeUpSm}
-            delay={0.1}
-            className="rounded-overlay border border-border-default bg-background-default p-6 sm:p-8"
-          >
-            <span className="flex size-11 items-center justify-center rounded-control bg-background-sunken text-text-primary">
-              <Building2 className="size-5" strokeWidth={1.75} />
-            </span>
-            <h2 className="mt-5 text-heading-lg font-semibold text-text-primary">
-              For organizers: one command center, not five tools
-            </h2>
-            <p className="mt-3 max-w-md text-body-sm text-text-secondary">
-              Replace Forms, Excel, and WhatsApp chasing with a single operating layer from
-              registration to the report you send sponsors.
-            </p>
-            <MotionStagger
-              className="mt-6 flex flex-wrap gap-2 border-t border-border-default pt-6"
-              staggerDelay={0.05}
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <MotionReveal
+              variants={fadeUpSm}
+              className="flex flex-col rounded-overlay border border-border-default bg-background-default p-8 sm:p-10"
             >
-              {organizerModules.map((module) => (
-                <MotionStaggerItem
-                  key={module}
-                  className="rounded-pill border border-border-default bg-background-sunken px-3 py-1.5 text-body-sm font-medium text-text-primary"
-                >
-                  {module}
-                </MotionStaggerItem>
-              ))}
-            </MotionStagger>
-          </MotionReveal>
+              <span className="flex size-12 items-center justify-center rounded-control bg-background-sunken text-text-primary">
+                <GraduationCap className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 className="mt-6 font-display text-heading-lg font-semibold text-text-primary">
+                Going as a participant?
+              </h3>
+              <p className="mt-3 max-w-sm text-body-sm text-text-secondary">
+                Never walk in without a team. See exactly how privacy-first matching finds you
+                serious teammates, step by step.
+              </p>
+              <Link
+                href="/participants"
+                className={`${buttonVariants({ size: "lg", variant: "secondary" })} mt-8 w-fit`}
+              >
+                For participants <ArrowRight className="size-4" strokeWidth={1.75} />
+              </Link>
+            </MotionReveal>
+
+            <MotionReveal
+              variants={fadeUpSm}
+              delay={0.1}
+              className="flex flex-col rounded-overlay border border-border-default bg-background-default p-8 sm:p-10"
+            >
+              <span className="flex size-12 items-center justify-center rounded-control bg-background-sunken text-text-primary">
+                <Building2 className="size-5" strokeWidth={1.75} />
+              </span>
+              <h3 className="mt-6 font-display text-heading-lg font-semibold text-text-primary">
+                Organizing an event?
+              </h3>
+              <p className="mt-3 max-w-sm text-body-sm text-text-secondary">
+                Replace Forms, Excel, and WhatsApp chasing with one command center — registration
+                to the report you send sponsors.
+              </p>
+              <Link
+                href="/organizers"
+                className={`${buttonVariants({ size: "lg", variant: "secondary" })} mt-8 w-fit`}
+              >
+                For organizers <ArrowRight className="size-4" strokeWidth={1.75} />
+              </Link>
+            </MotionReveal>
+          </div>
         </div>
       </MotionSection>
 
@@ -509,27 +636,29 @@ export default function LandingPage() {
         </div>
       </MotionSection>
 
-      <MotionSection className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
+      <MotionSection className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-28">
+        <div className="text-center">
+          <MotionReveal variants={fadeUpSm}>
             <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
               Start with a live event
             </p>
-            <h2 className="mt-2 max-w-xl text-heading-lg font-semibold text-text-primary">
+            <h2 className="mx-auto mt-3 max-w-2xl font-display text-display-lg font-semibold text-text-primary text-balance">
               Browse current hackathons, or see the organizer command center for yourself.
             </h2>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/events" className={buttonVariants({ size: "lg" })}>
-              Browse events <ArrowRight className="size-4" strokeWidth={1.75} />
-            </Link>
-            <Link
-              href="/organizer/events/jordan-ai-builders-hackathon"
-              className={buttonVariants({ size: "lg", variant: "secondary" })}
-            >
-              View organizer demo
-            </Link>
-          </div>
+          </MotionReveal>
+          <MotionReveal variants={fadeIn} delay={0.15}>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/events" className={buttonVariants({ size: "lg" })}>
+                Browse events <ArrowRight className="size-4" strokeWidth={1.75} />
+              </Link>
+              <Link
+                href="/organizer/events/jordan-ai-builders-hackathon"
+                className={buttonVariants({ size: "lg", variant: "secondary" })}
+              >
+                View organizer demo
+              </Link>
+            </div>
+          </MotionReveal>
         </div>
       </MotionSection>
     </div>
