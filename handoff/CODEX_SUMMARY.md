@@ -1,146 +1,106 @@
 # CODEX SUMMARY
 
 ## Task
-PHASE-UI-001 - redesign only `/events/[slug]` using the approved Sandstone Editorial tokens and primitives.
+PHASE-UI-002 - redesign only the public `/events` listing surface using the approved Sandstone Editorial tokens and primitives.
 
 ## What changed
-- Replaced the event detail gradient cover with a flat, token-only typographic identity section.
-- Added a system-generated event mark from the event title via `getEventMark(title)`.
-- Reworked the page hierarchy to: identity band, facts strip, tracks, timeline, rules, prizes, privacy note, and a mobile sticky registration CTA.
-- Migrated the event detail page and facts strip from compatibility aliases to semantic token classes.
-- Kept the public data shape, mock data, `generateStaticParams()`, and `notFound()` behavior unchanged.
+- Reworked `/events` spacing and wrapper treatment to the public Sandstone surface rhythm.
+- Replaced `EventCard`'s per-event gradient cover with a flat, token-only system identity panel generated from existing event data.
+- Migrated `EventCard` away from legacy compatibility aliases and raw Tailwind type sizes to semantic text/background/border/type classes.
+- Updated the `/events` loading skeleton to match the redesigned header and card-grid structure.
+- Preserved the existing `hackathons.map(...)` data flow and every `Link href={`/events/${hackathon.slug}`}` target.
 
 ## Files touched
-- `src/app/(public)/events/[slug]/page.tsx`
-- `src/components/events/event-facts-strip.tsx`
+- `src/app/(public)/events/page.tsx`
+- `src/app/(public)/events/loading.tsx`
+- `src/components/events/event-card.tsx`
 - `handoff/CODEX_SUMMARY.md`
 
-`src/app/(public)/events/[slug]/not-found.tsx` was read and left unchanged because it already uses the approved primitives and had no legacy alias classes.
-
 ## Cover / identity treatment
-Before, the cover depended on the mock gradient field:
+Before, each card depended on the mock gradient field:
 
 ```tsx
-<div className={cn("bg-gradient-to-br", hackathon.coverGradient)}>
-  <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-    <div className="flex items-center gap-3">
-      <StatusBadge status={hackathon.status} />
-      <span className="text-sm text-white/80">{hackathon.organizerName}</span>
-    </div>
-    <h1 className="mt-3 max-w-2xl text-3xl font-semibold text-white sm:text-4xl">
-      {hackathon.title}
-    </h1>
-    <p className="mt-3 max-w-xl text-white/85">{hackathon.description}</p>
+<div className={cn("h-28 bg-gradient-to-br", hackathon.coverGradient)} />
+```
+
+After, the cover is token-only and system-generated from existing event fields:
+
+```tsx
+<div className="flex h-32 flex-col justify-between border-b border-border-default bg-background-sunken p-4">
+  <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+    {hackathon.theme}
+  </p>
+  <div className="flex items-end justify-between gap-4">
+    <p className="font-display text-heading-lg font-semibold text-text-primary">
+      {getEventMark(hackathon.title)}
+    </p>
+    <p className="text-label font-medium uppercase tracking-label text-text-tertiary">
+      {modeLabel[hackathon.mode]}
+    </p>
   </div>
 </div>
 ```
 
-After, the cover is a token-only typographic lockup with a flat sunken identity panel:
-
-```tsx
-<section className="border-b border-border-default bg-background-default">
-  <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 lg:items-end">
-      <div className="lg:col-span-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge status={hackathon.status} />
-          <span className="text-body-sm text-text-secondary">{hackathon.organizerName}</span>
-        </div>
-        <h1 className="mt-4 max-w-3xl text-heading-lg font-display font-semibold text-text-primary text-balance sm:text-display-lg">
-          {hackathon.title}
-        </h1>
-      </div>
-      <div className="relative overflow-hidden rounded-card border border-border-default bg-background-sunken p-6 sm:p-8">
-        ...
-        <p className="mt-8 font-display text-display-lg font-semibold text-text-primary">
-          {getEventMark(hackathon.title)}
-        </p>
-      </div>
-    </div>
-  </div>
-</section>
-```
-
-No `bg-gradient-*`, `hackathon.coverGradient`, image dependency, or raw color value remains in the cover treatment.
+No `bg-gradient-*`, `hackathon.coverGradient`, image dependency, or raw color value remains in the card cover.
 
 ## Legacy alias replacements
-`src/app/(public)/events/[slug]/page.tsx`:
-- Removed `bg-gradient-to-br` plus `hackathon.coverGradient`; replaced with `bg-background-default`, `border-border-default`, and a flat `bg-background-sunken` identity panel.
-- Replaced `text-white/80`, `text-white`, and `text-white/85` with `text-text-secondary` / `text-text-primary`.
+`src/components/events/event-card.tsx`:
+- Removed `bg-gradient-to-br` plus `hackathon.coverGradient`; replaced with `bg-background-sunken`, `border-border-default`, and a generated `getEventMark(hackathon.title)` typographic mark.
+- Removed `cn` because the gradient class composition is gone.
+- Replaced `text-ink-subtle` with `text-text-secondary` / `text-text-tertiary`.
 - Replaced `text-ink` with `text-text-primary`.
+- Replaced `group-hover:text-accent` with `group-hover:text-brand` on interactive hover only.
 - Replaced `text-ink-muted` with `text-text-secondary`.
-- Replaced `border-border` with `border-border-default`.
-- Removed timeline `bg-accent`; timeline now uses numbered `bg-background-sunken` markers with `border-border-default`.
-- Replaced `text-accent` prize/privacy icons with neutral `text-text-primary` icon wells.
-- Replaced `border-accent/30 bg-accent-soft/40` privacy styling with `border-border-strong` on the standard white `Card`.
+- Replaced `hover:shadow-sm` with sanctioned `group-hover:shadow-raised`.
+- Replaced raw type utilities like `text-xs`, `text-sm`, and `text-lg` with `text-label`, `text-body-sm`, and `text-heading-sm`/`text-heading-lg`.
 
-`src/components/events/event-facts-strip.tsx`:
-- Replaced `rounded-lg` with `rounded-card`.
-- Replaced `border-border` with `border-border-default`.
-- Replaced `bg-paper-raised` with `bg-background-default`.
-- Replaced `text-accent` with `text-text-secondary`.
-- Replaced `text-sm` with `text-body-sm`.
-- Replaced `text-ink` with `text-text-primary`.
-- Replaced off-scale `gap-2.5` / `mt-0.5` with scale classes `gap-3` / `mt-1`.
+`src/app/(public)/events/page.tsx`:
+- No legacy compatibility alias classes were present in the current file. The wrapper now uses `bg-background-default` and `text-text-primary`, and grid spacing now uses the page/card rhythm from the design system.
+
+`src/app/(public)/events/loading.tsx`:
+- No legacy compatibility alias classes were present in the current file. The skeleton now uses `bg-background-default`, `border-border-default`, `rounded-card`, and `rounded-pill` in the updated card skeleton shape.
 
 ## Clay / brand usage
-No explicit `text-brand`, `bg-brand`, `border-brand`, `bg-brand-tint`, `text-accent`, `bg-accent`, or `bg-accent-soft` class appears in the touched page or facts strip.
-
-Brand color is used only through the approved primary `buttonVariants({ size: "lg" })` action:
+Brand color appears only as inherited section-header emphasis or interactive state feedback:
 
 ```tsx
-className={buttonVariants({ size: "lg" })}
+<p className="text-label font-semibold uppercase tracking-label text-brand">{eyebrow}</p>
 ```
 
-and the mobile sticky version:
+from the existing `SectionHeader` primitive, plus these `EventCard` interaction states:
 
 ```tsx
-className={`${buttonVariants({ size: "lg" })} w-full`}
+group-focus-visible:border-brand group-focus-visible:ring-brand-tint
 ```
-
-That resolves through the existing primitive to the primary action styling:
 
 ```tsx
-bg-brand text-brand-foreground hover:bg-brand-hover active:bg-brand-hover
+group-hover:text-brand
 ```
 
-The matching-pool link remains secondary:
+No `bg-brand`, `bg-brand-tint`, `text-accent`, `bg-accent`, or brand decorative fill appears in the touched files.
+
+## Links and route behavior
+Every card still links through the existing slug:
 
 ```tsx
-className={buttonVariants({ size: "lg", variant: "secondary" })}
+<Link href={`/events/${hackathon.slug}`} className="group block h-full focus-visible:outline-none">
 ```
 
-## Static generation and not-found behavior
-- `generateStaticParams()` remains unchanged:
-
-```tsx
-export function generateStaticParams() {
-  return hackathons.map((h) => ({ slug: h.slug }));
-}
-```
-
-- Unknown slugs still call `notFound()` through the unchanged guard:
-
-```tsx
-if (!hackathon) {
-  notFound();
-}
-```
-
-- `npm run build` confirmed all three static event slugs:
+`npm run build` confirmed the existing detail slugs still prerender:
 
 ```text
-├ ● /events/[slug]
-│ ├ /events/jordan-ai-builders-hackathon
-│ ├ /events/usj-fintech-sprint
-│ └ /events/psut-hardware-hack
+/events/jordan-ai-builders-hackathon
+/events/usj-fintech-sprint
+/events/psut-hardware-hack
 ```
 
-## Responsive behavior
-- At 375px: the hero uses `grid-cols-1`, CTAs stack vertically, the identity panel stacks below the title, the facts strip is one column, the content/aside layout is one column, and the mobile sticky `Register now` CTA is visible with page bottom padding (`pb-24`) to avoid overlap.
-- At 1280px: the hero uses `lg:grid-cols-3` with the main copy spanning two columns and the identity panel in the third, the facts strip uses `lg:grid-cols-4`, the main content uses `lg:grid-cols-3`, and the prizes/privacy rail is sticky via `lg:sticky lg:top-24`.
+The event detail page was not touched.
 
-No screenshot or visual-diff automation exists in this repo that I could use: `package.json` has no Playwright/Cypress/Puppeteer script or dependency, and scans for those tools returned no local setup. The responsive check above is based on the implemented breakpoint classes rather than fabricated screenshot evidence.
+## Responsive behavior
+- At 375px: `/events` uses 16px gutters (`px-4`), a single-column grid (`grid-cols-1`), 16px card gaps (`gap-4`), and each card keeps a fixed 128px identity cover above stacked metadata rows.
+- At 1280px: content is constrained to `max-w-6xl`, the grid becomes three columns via `lg:grid-cols-3`, gaps increase to 24px via `sm:gap-6`, and card heights align through `h-full`/`flex-1`.
+
+No screenshot or visual-diff automation exists as a repo command or direct `package.json` dependency for Playwright, Cypress, or Puppeteer. The responsive check above is based on the implemented breakpoint classes rather than fabricated screenshot evidence.
 
 ## Verification results
 - `npm run build` - passed.
@@ -154,7 +114,7 @@ No screenshot or visual-diff automation exists in this repo that I could use: `p
 
 Additional local checks:
 - Raw hex scan across touched `.tsx` files - no matches.
-- Legacy alias / gradient scan across the redesigned page and facts strip - no matches.
+- Legacy alias / gradient / `coverGradient` scan across touched files - no matches.
 - `git diff --check` - passed; Git only reported existing Windows line-ending normalization warnings.
 
 ## Scope checks
@@ -166,8 +126,8 @@ Additional local checks:
 - No public marketplace, public people browsing, public contact reveal, AI winner selection, public negative scoring, or sponsor raw-data access was introduced.
 
 ## Deviations
-- No scope deviations.
-- Minor display-format choice: while rewriting `EventFactsStrip`, the date/location/team-size separators were normalized to ASCII hyphens to avoid introducing new non-ASCII punctuation in the touched file.
+- The card display copy changed as part of the redesign: the previous truncated description line was removed from `EventCard`, and a non-button `View details` link affordance was added inside the existing clickable card. This stays within the task's card/listing redesign scope and supports the requested CTA/hover affordance clarity.
+- Date, location, and team-size separators in `EventCard` were normalized to ASCII hyphens.
 
 ## Open questions
 None.
