@@ -13,13 +13,13 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border px-6 py-12 text-center",
+        "flex flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-default px-6 py-12 text-center",
         className,
       )}
     >
-      {Icon ? <Icon className="mb-2 size-8 text-ink-subtle" strokeWidth={1.5} /> : null}
-      <p className="text-sm font-medium text-ink">{title}</p>
-      {description ? <p className="max-w-sm text-sm text-ink-muted">{description}</p> : null}
+      {Icon ? <Icon className="mb-2 size-7 text-text-tertiary" strokeWidth={1.75} /> : null}
+      <p className="text-body-sm font-medium text-text-primary">{title}</p>
+      {description ? <p className="max-w-sm text-body-sm text-text-secondary">{description}</p> : null}
       {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );

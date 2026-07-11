@@ -3,11 +3,11 @@ import { cn } from "@/lib/utils";
 export type StatusTone = "pending" | "success" | "danger" | "info" | "neutral";
 
 const toneClasses: Record<StatusTone, string> = {
-  pending: "bg-status-pending-bg text-status-pending-fg",
-  success: "bg-status-success-bg text-status-success-fg",
-  danger: "bg-status-danger-bg text-status-danger-fg",
-  info: "bg-status-info-bg text-status-info-fg",
-  neutral: "bg-status-neutral-bg text-status-neutral-fg",
+  pending: "bg-status-warning-tint text-status-warning-fg",
+  success: "bg-status-success-tint text-status-success-fg",
+  danger: "bg-status-error-tint text-status-error-fg",
+  info: "bg-status-info-tint text-status-info-fg",
+  neutral: "bg-status-neutral-tint text-status-neutral-fg",
 };
 
 // Central mapping so every status string in the product renders identically.
@@ -49,7 +49,7 @@ export function StatusBadge({ status, label, tone, className }: StatusBadgeProps
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium capitalize",
+        "inline-flex items-center rounded-pill px-2.5 py-1 text-label font-medium capitalize",
         toneClasses[resolvedTone],
         className,
       )}
