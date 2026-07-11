@@ -1,40 +1,40 @@
-# CLAUDE REVIEW — PHASE-UI-000
+# CLAUDE REVIEW — PHASE-UI-001
 
 ## Verdict
 **APPROVE**
 
 ## What I checked
 - `git status` / `git diff --stat` — full file list and change sizes.
-- `git diff src/app/globals.css` — full diff, read directly.
-- `git diff src/components/ui/button.tsx src/components/ui/card.tsx` — full diff.
-- `git diff` for `status-badge.tsx`, `metric-card.tsx`, `empty-state.tsx`, `section-header.tsx`, `skeleton.tsx` — full diff.
-- Grep across the repo for `variant="outline"` / `variant: "outline"` to check whether the removed `Button` variant had any call site.
-- Grep for raw hex patterns (`#[0-9a-fA-F]{3,8}`) across every touched `.tsx` primitive — zero matches.
+- `git diff "src/app/(public)/events/[slug]/page.tsx"` — full diff, read directly.
+- `git diff src/components/events/event-facts-strip.tsx` — full diff, read directly.
+- Grep for raw hex patterns (`#[0-9a-fA-F]{3,8}`) across both touched files — zero matches.
+- Grep confirming `theme` and `registrationClosesAt` are genuine, pre-existing fields on the `Hackathon` type and mock data (not invented to make the new identity panel work).
 - `git status --porcelain` filtered for `??` (untracked/new files) — none.
-- Ran `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` myself — all four steps passed, all seven routes still build.
+- Ran `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` myself — all four steps passed, and the build output confirms all three static slugs still prerender.
 
 ## Answers
 
 1. **Verdict:** APPROVE.
-2. **Stayed within PHASE-UI-000 scope:** Yes. Every change is a token/primitive restyle; no page, no new component file, no forbidden pattern.
-3. **`git diff` limited to allowed files:** Yes — exactly `src/app/globals.css`, the 7 named primitives, and `handoff/CODEX_SUMMARY.md`. Nothing else appears in `git diff --stat`.
-4. **No `src/app/**/page.tsx` changed:** Confirmed — absent from the diff.
-5. **No docs changed:** Confirmed — absent from the diff.
-6. **No Supabase/database files changed:** Confirmed — absent from the diff.
-7. **No package files changed:** Confirmed — `package.json`/`package-lock.json` absent from the diff.
-8. **No new primitive files created:** Confirmed — `git status --porcelain` shows only `M` entries, zero `??` (untracked) files.
-9. **`globals.css` tokens align with `docs/DESIGN_SYSTEM.md`:** Yes. Every hex value in the new token block matches the §D table verbatim: `#FFFFFF` background/default, `#F7F6F3` background/sunken, `#191714` ink/background-inverse, `#5C574E`/`#8D877B` text tiers, `#E8E5E0`/`#D6D2CA` borders, `#A03D21`/`#873218`/`#F8EDE7` brand, and the four status fg/tint pairs (`#1E6B40`/`#E8F3EC`, `#8A6116`/`#F8F0DC`, `#B3261E`/`#F9E9E7`, `#1F5C8F`/`#E7F0F7`). Radii (6/8/10/14/999) and exactly two shadow tokens (`--elevation-raised`, `--elevation-overlay`) match §G's closed sets. The old dark-mode `@media (prefers-color-scheme: dark)` block was deleted entirely, not merely left unused — correct for the light-only V1 decision (D18).
-10. **Touched primitives use semantic tokens:** Yes. Every primitive's diff replaces literal/legacy Tailwind utility classes (`bg-paper`, `text-ink`, `rounded-lg`, `text-sm`, `text-2xl`) with the new semantic token classes (`bg-background-default`, `text-text-primary`, `rounded-card`, `text-body-sm`, `text-metric`, etc.).
-11. **Raw hex values inside touched `.tsx` files:** None found by direct grep across all seven files — zero matches.
-12. **Button call sites preserved:** Effectively yes, but with one deviation worth flagging (see below): the `outline` variant was removed and replaced with a new `destructive` variant. I grepped the entire `src/` tree for `variant="outline"`/`variant: "outline"` and found **zero call sites**, so nothing broke in practice. Still, this is an unannounced public-API change (a variant removed, not just restyled) that the handoff's "Primitive notes" section documents but does not flag as a deviation — the `## Deviations` section says "None," which is not quite accurate. Not blocking since no call site exists and the acceptance criterion ("preserve existing call sites") is technically satisfied, but worth naming explicitly rather than silently absorbing.
-13. **Missing Badge/Input primitives skipped and noted:** Yes — `CODEX_SUMMARY.md`'s "Skipped primitive gaps" section lists `Badge`, `Input`, `Select`, `Tabs`, table/data-table, chip/tag, dialog/modal, breadcrumb, `ErrorState`, `CopyField`, `Stepper`, `TimelineList` as correctly not created.
-14. **No dark mode, gradients, glassmorphism, decorative animations, or random shadows:** Confirmed. Dark-mode media query deleted (not added). No `linear-gradient`/`radial-gradient`, no `backdrop-blur`/`bg-white/`-style glass patterns, in any diff. Motion additions are limited to a `motion-reduce:animate-none`-safe skeleton pulse and a `Button` `isLoading` spinner (also `motion-reduce`-safe) — both functional/utility, not decorative. Shadows are limited to the two sanctioned `--elevation-*` tokens; no ad-hoc shadow values appear anywhere in the diff.
-15. **`verify.ps1` passes:** Yes, re-ran independently: `npm run build` ✅ (all 7 routes still compile/prerender), `npx tsc --noEmit` ✅, `npx eslint .` ✅, forbidden-string scan ✅.
-16. **Exact fixes needed:** None blocking. One documentation nit only (see #12): the handoff's "Deviations: None" should have named the `outline` → `destructive` variant swap as a small, unrequested-but-harmless API change. Not worth a fix-and-resubmit cycle given zero call sites are affected — noting it here for the record rather than sending back.
+2. **Stayed within PHASE-UI-001 scope:** Yes. Every change is contained to the event detail page and its one shared component; no primitive, no other route, no data-shape change.
+3. **`git diff` limited to allowed files:** Yes — exactly `src/app/(public)/events/[slug]/page.tsx`, `src/components/events/event-facts-strip.tsx`, and `handoff/CODEX_SUMMARY.md`. `not-found.tsx` was correctly left untouched (it already used approved primitives with no legacy aliases, as the handoff states and I independently confirmed by reading it — unchanged in the diff).
+4. **Only `/events/[slug]` surface and directly related components changed:** Yes.
+5. **No unrelated page files changed:** Confirmed — landing, listing, dashboard, organizer pages absent from the diff.
+6. **No docs changed:** Confirmed.
+7. **No Supabase/database files changed:** Confirmed.
+8. **No package files changed:** Confirmed.
+9. **No new dependencies added:** Confirmed — no `package.json` change, and the new `getEventMark`/`formatDate` helpers are plain local functions using existing `Intl` builtins, not new packages.
+10. **No raw hex values in TSX:** Confirmed by independent grep — zero matches in either touched file.
+11. **Design follows Sandstone Editorial:** Yes, substantively. The gradient cover (`bg-gradient-to-br` + `hackathon.coverGradient`) is fully removed and replaced with a flat, bordered, token-only identity panel using `bg-background-sunken`, `border-border-default`, and a typographic monogram mark (`getEventmark` derives initials from the title — no image dependency, matches the "system-generated, non-illustration" requirement). All legacy alias classes (`text-ink`, `text-ink-muted`, `bg-paper-raised`, `border-border`, `text-accent`, `bg-accent-soft`, `text-white/*`) are replaced with the correct semantic equivalents throughout both files — verified directly in the diff, not just taken from the handoff's claims. Timeline markers moved from a bare `bg-accent` dot to numbered `bg-background-sunken` chips consistent with the anti-decoration doctrine. Typography now routes through the type-scale tokens (`text-heading-lg`, `text-body-sm`, `text-label`, `text-display-lg`) instead of raw Tailwind size utilities.
+12. **Clay used for action emphasis, not decoration:** Yes. Grep-confirmed zero explicit `text-brand`/`bg-brand`/`text-accent`/`bg-accent-soft` classes remain in either file — the *only* brand-color surface left is the primary `buttonVariants({ size: "lg" })` CTA (both the inline "Register now" and the new mobile sticky-CTA duplicate), which resolves through the unmodified `Button` primitive to `bg-brand text-brand-foreground`. The secondary matching-pool link correctly stays on the `secondary` variant (no brand color). This is exactly "action emphasis, not wallpaper."
+13. **Layout reasonable at 375px and 1280px:** Reasonable, with acceptable evidence limits. The class-level reasoning holds up under direct diff reading: `grid-cols-1` → `lg:grid-cols-3` for the hero, CTAs stack via `flex-col` → `sm:flex-row`, the facts strip collapses to one column, the aside goes `lg:sticky lg:top-24`, and a `fixed inset-x-0 bottom-0 ... sm:hidden` mobile sticky CTA was added with a matching `pb-24 sm:pb-0` body padding to avoid overlap — a genuinely thoughtful mobile-specific addition, not just a responsive-class afterthought. No actual browser/viewport screenshot exists (correctly disclosed, see #14 below), so this is verified by code reading, not visual proof — acceptable per this task's own acceptance criterion, which permits "careful class-by-class reasoning" as a fallback.
+14. **Existing event slugs still render:** Confirmed independently — I re-ran the build myself; `npm run build` output shows `/events/jordan-ai-builders-hackathon`, `/events/usj-fintech-sprint`, `/events/psut-hardware-hack` all still statically generated under `● /events/[slug]`. `generateStaticParams()` and the `notFound()` guard are both byte-identical to before (confirmed in the diff — only the cover/body JSX changed, not the data-fetching logic).
+15. **`verify.ps1` passes:** Yes, re-ran independently: `npm run build` ✅, `npx tsc --noEmit` ✅, `npx eslint .` ✅, forbidden-string scan ✅.
+16. **Exact fixes needed:** None blocking.
 
-## Notes
-- Compatibility aliases (`--paper`, `--ink`, `--accent`, etc.) were kept as `var()` indirections onto the new semantic tokens rather than deleted, which is exactly right for this task's "keep existing page JSX unchanged" constraint — pages consuming the old alias names still render correctly with the new palette values, with no page-file edits required.
-- CRLF/LF warnings on `git diff` are the known Windows line-ending cosmetic non-issue, not a defect.
+## Notes (non-blocking)
+- The handoff's screenshot-automation disclosure is honest and matches reality — no Playwright/Cypress/Puppeteer setup exists in this repo, and the handoff says so plainly instead of fabricating visual proof. Good discipline, consistent with the task's explicit requirement.
+- One very minor, correctly-disclosed deviation: `EventFactsStrip`'s separators (en dash `–`, middle dot `·`) were normalized to ASCII hyphens `-`. This is copy-adjacent but was flagged honestly in the handoff's `## Deviations` section (unlike the earlier `PHASE-UI-000` handoff, which under-flagged a similar-scale change) — exactly the discipline I asked for in the prior review. Cosmetic only, does not affect meaning, not worth a fix-and-resubmit cycle.
+- The new `dl`/`dt`/`dd` identity panel surfaces `hackathon.theme` and `hackathon.registrationClosesAt` — both genuine pre-existing fields on the `Hackathon` type (verified by grep against `src/types/domain.ts` and `src/lib/mock-data.ts`), not invented data. Correct use of "existing mock data as-is."
 
 ## Recommendation to human
-Approve and commit. Suggest a one-line addition to Codex's future handoffs: explicitly flag primitive variant additions/removals (not just restyles) under "Deviations," even when no call site is affected — makes review faster and avoids relying on an independent grep to catch it.
+Approve and commit. No follow-up fix task required. `PHASE-UI-001` is fully closed; next candidate per `docs/DESIGN_SYSTEM.md` §L Tier 1 order is the organizer command center or the landing page, per your sequencing preference.
