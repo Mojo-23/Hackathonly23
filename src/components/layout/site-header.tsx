@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 const navLinks = [
   { href: "/events", label: "Events" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/organizer/events/jordan-ai-builders-hackathon", label: "For organizers" },
+  { href: "/organizers", label: "For organizers" },
 ];
 
 export function SiteHeader() {

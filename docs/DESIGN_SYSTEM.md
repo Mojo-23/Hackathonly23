@@ -238,30 +238,55 @@ Global physics apply to every component: token-only colors, closed radius set, 1
 
 ## I. Motion System
 
-**Motion is state feedback, not decoration.** If an animation doesn't tell the user something changed, it is decoration, and decoration is debt.
+**Revised 2026-07-11 (decision D19) — this section replaces the earlier closed/restrictive motion law.** Full implementation reference, component APIs, and worked examples live in `docs/MOTION_SYSTEM.md`; that file is binding alongside this one for any animated UI work. Where the two conflict, `MOTION_SYSTEM.md` wins on implementation detail, this section wins on product-level intent.
 
-### Timing tokens (closed set)
+**Motion is now a first-class part of Sandstone Editorial's premium feel, not just state feedback.** The product's public-facing surfaces (starting with the landing page) use a considered, controlled motion language — entrance sequencing, scroll reveal, stagger, ambient drift, count-up numbers, cursor parallax — to read as a live platform rather than a static document. This is a deliberate widening of the original "motion is only feedback" rule; the discipline moves from *"animate almost nothing"* to *"animate everything with the same restrained hand."*
 
-| Token | Value | Use | Easing |
-|---|---|---|---|
-| `motion/fast` | 120ms | Hovers, toggles, focus rings | ease-out |
-| `motion/base` | 200ms | Dropdowns, tabs, accordions, tooltips | `cubic-bezier(0.2, 0, 0, 1)` |
-| `motion/slow` | 300ms | Modals, drawers, page-content entrance | same |
+### Timing tokens (closed set — extended)
 
-**Nothing over 400ms is ALLOWED except the two signature moments below.**
+Canonical values live in `src/lib/motion/tokens.ts`; this table documents intent, that file is the source of truth for exact numbers.
 
-### Motion law
+| Token | Value | Use |
+|---|---|---|
+| `duration.fast` | 150ms | Hover/press micro-interactions, focus rings |
+| `duration.base` | 350ms | Default entrance/hover transitions, stagger item transitions |
+| `duration.slow` | 600ms | Hero/section entrance, dashboard scale-in, count-up run time |
+| `duration.reveal` | 500ms | Scroll-reveal fade/rise for headings, paragraphs, cards |
+| `duration.ambient` | 8s+ | Idle/looping ambient motion (floating elements, marquee) |
+| `duration.pulse` | 2s | Slow opacity pulse loop for a "live"/status indicator dot |
+| `duration.heroPanelDelay` | 350ms | Delay before a hero's dominant preview panel begins its entrance |
+| `stagger.item` | 80ms | Delay between grid/list children (cards, avatars, tags) |
+| `stagger.heroLine` | 120ms | Delay between hero text lines on page load |
+| `easing.standard` | `cubic-bezier(0.16,1,0.3,1)` | General-purpose ease-out |
+| `easing.entrance` | `cubic-bezier(0.22,1,0.36,1)` | Hero/section entrances |
 
-- FORBIDDEN: parallax; spring/bounce easing; scroll-triggered fade-up on sections (the single loudest AI-slop tell — banned outright); ambient looping animation; hover lifts on non-interactive elements; decorative motion of any kind.
-- Entrances: content MAY fade+rise 4–8px once per page load as ONE choreographed group (sibling stagger ≤ 40ms, total ≤ 300ms) — never per-section on scroll.
-- Dashboards: numbers MAY count up on first load only (≤ 600ms); subsequent updates swap instantly.
-- Loading: skeletons MUST match final layout exactly (no layout shift); spinners ALLOWED only inside buttons.
-- Modal: fade + 8px rise + scale-from-98%, 300ms in / 200ms out. Exits MUST be faster than entrances.
-- `prefers-reduced-motion` MUST be respected globally; every surface MUST remain fully legible with motion off.
+These values are **closed** in the same sense as the color/radius/spacing sets: Codex must import them from `src/lib/motion/tokens.ts`, never hardcode a duration/delay/easing inline. Adding a new token requires updating that file and this table together, not a one-off value in a component.
 
-### Signature moments (the entire theatrical budget — exactly two)
+### Motion categories and rules
 
-1. **Contact reveal.** Locked contact info renders genuinely blurred/obscured with a lock glyph — designed to look protective, not broken. On final teammate acceptance: lock releases, blur resolves to sharp text over ~500ms, brief clay underline sweep. MUST feel earned and protective. This moment is ALLOWED to exceed the normal timing budget; nothing else on the matching surface is.
+- **Entrance (page load).** The hero text block animates as one staggered sequence (eyebrow → heading → subhead → CTAs, `stagger.heroLine` between lines) on mount, not on scroll. The hero's dominant visual element (e.g. a dashboard/product-preview panel) MAY scale in from 0.96→1 with a fade, once, after the text sequence begins. This is the one section allowed a "big" entrance; it sets the tone, it does not repeat.
+- **Scroll reveal.** Sections and their headings/paragraphs/cards MAY fade+rise into view once via `MotionReveal`/`MotionSection`, triggered by `whileInView` with `once: true`. Grids and lists MUST stagger their children via `MotionStagger`/`MotionStaggerItem` rather than appearing as one block. Reveals never replay on scroll back up. Avoid using the exact same variant on every single section — vary between `fadeUp`, `fadeUpSm`, and `fadeIn` (see `src/lib/motion/variants.ts`) so the page doesn't read as one repeated tic.
+- **Hover/focus interactions.** Every interactive element MUST have a visible hover state and a press/tap state. Cards use `MotionCard` (translateY -4px + slight scale on hover, scale-down on tap) — transform/opacity only, never animates border color or box-shadow spread directly (those stay CSS transitions on the existing `duration.fast` token). Text links use a CSS-driven icon-shift (`group-hover:translate-x-*`) rather than a JS animation — cheaper and sufficient. Keyboard focus rings (`focus-visible:ring-*`) MUST remain fully visible and are never suppressed by a motion wrapper.
+- **Ambient motion.** Small, slow, decorative drift (e.g. floating stat tiles, a pulsing "live" dot) is ALLOWED via `FloatingElement`, but MUST stay slow (`duration.ambient`, 8s+ per loop), small in distance (4–10px), and MUST NOT be used on anything the user needs to read precisely or click quickly. Ambient motion is set-dressing, not a focal point.
+- **Cursor parallax.** ALLOWED for exactly one dominant hero element via `useCursorParallax`, capped at a small pixel offset (≤10px), spring-smoothed (not 1:1 cursor tracking), and only on non-touch pointer input. Parallax must never be the primary way information is revealed.
+- **Counters and progress.** Numeric stats MAY count up from 0 once, when scrolled into view, via `MotionCounter` (`useInView`, `once: true`). They MUST NOT replay on re-scroll. Progress-style indicators follow the same once-only rule.
+- **Connector/progress lines.** A thin animated line indicating sequence/progress (e.g. across a lifecycle strip) MAY use the brand/clay color as a **progress indicator**, not a decorative fill — this is a narrow, named exception to the "clay is action-only" rule in §D, permitted specifically for this pattern and nowhere else without a documented decision.
+- **Marquee.** A slow (`≥30s` full loop), continuous horizontal marquee is ALLOWED for logo/social-proof rows via `MotionMarquee`. Marquees MUST NOT be used for content the user needs to read completely (never for primary navigation or CTAs) and MUST pause/disable under reduced motion.
+- **Section transitions.** Sections MAY use a background/theme break (e.g. one inverted dark section) as a deliberate rhythm device, at most sparingly across a page — this is a compositional tool, not a per-section default. Abstract background shapes/oversized type MAY move slowly if used; they remain optional polish, not a requirement for every section.
+- **Loading.** Skeletons MUST still match final layout exactly (no layout shift); spinners remain ALLOWED inside buttons (see `isLoading` on `Button`).
+- **FORBIDDEN regardless of the above:** spring/bounce easing that reads as playful/gamified; motion faster than is comfortably legible; any animation that blocks reading or clicking; layout-affecting animation (animate `transform`/`opacity` only — never `width`/`height`/`top`/`left` in a way that triggers reflow); fast/aggressive carousels; motion that cannot be disabled by `prefers-reduced-motion`.
+
+### Reduced motion — mandatory, not optional
+
+- Every motion primitive in `src/components/motion/` and every hook in `src/lib/motion/` MUST check `useReducedMotionSafe()` (from `src/lib/motion/use-reduced-motion-safe.ts`) and render the fully-legible, static end-state when it is true — entrance sequences render already-visible, scroll reveals render already-in-place, ambient drift and parallax fully disable, counters render their final value with no animation.
+- No component may reimplement its own reduced-motion check with a different hook or a raw `matchMedia` call — always use `useReducedMotionSafe`.
+- Reduced motion must never hide content or functionality — it only removes the animation, never the information.
+
+### Signature moments (unchanged, still the most theatrical two)
+
+These remain the two moments explicitly allowed to exceed the standard timing budget — they predate and are unaffected by the wider motion language above:
+
+1. **Contact reveal.** Locked contact info renders genuinely blurred/obscured with a lock glyph — designed to look protective, not broken. On final teammate acceptance: lock releases, blur resolves to sharp text over ~500ms, brief clay underline sweep. MUST feel earned and protective.
 2. **QR check-in success.** Scan confirms → fast full-screen `status/success/tint` flash, participant name large + big checkmark, auto-reset ~800ms. Optimized for a volunteer scanning 200 people in bad lighting — legibility at arm's length IS the delight. Speed is the feature.
 
 ## J. Mobile-First Rules

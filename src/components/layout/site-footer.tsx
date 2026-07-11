@@ -11,14 +11,17 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex gap-6 text-sm text-ink-muted">
+          <Link href="/events" className="hover:text-ink">
+            Events
+          </Link>
+          <Link href="/organizers" className="hover:text-ink">
+            Organizers
+          </Link>
           <Link href="/privacy" className="hover:text-ink">
             Privacy
           </Link>
           <Link href="/terms" className="hover:text-ink">
             Terms
-          </Link>
-          <Link href="/events" className="hover:text-ink">
-            Events
           </Link>
         </div>
       </div>

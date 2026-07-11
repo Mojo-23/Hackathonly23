@@ -66,6 +66,21 @@ Canonical account creation is hybrid. A Phase 3 signup trigger creates the minim
 - Type system: General Sans (display, marketing only) + Inter (everything in-app), both self-hosted (network-independent build preserved); IBM Plex Sans Arabic reserved for i18n.
 - The Phase 2 token base in `src/app/globals.css` is now out of date by design; it gets replaced in `PHASE-UI-000` (tokens + fonts + primitives only, no page redesigns), which must precede any surface-level UI work.
 
+## D19 — Expanded motion system (Framer Motion), replacing the closed/restrictive motion law in D18
+**Status: accepted** (`PHASE-UI-003B` follow-up, direct human-authorized Claude implementation, 2026-07-11). Full specification: `docs/DESIGN_SYSTEM.md` §I (product intent, revised) and `docs/MOTION_SYSTEM.md` (binding implementation reference — component APIs, tokens, worked examples). Both are review-blocking for any animated UI work, same enforcement level as the rest of `DESIGN_SYSTEM.md`.
+
+**Reason:** the original motion law in D18/§I (near-zero motion, no scroll reveal, no parallax, no ambient animation, 300ms/400ms hard caps) produced a landing page that read as flat and document-like — explicitly rejected by the human as feeling like "a Notion/internal admin report, not a premium public hackathon platform homepage." A considered, restrained-but-real motion language (entrance sequencing, once-only scroll reveal, stagger, ambient drift, count-up, single-element cursor parallax) was judged necessary to reach the TAIKAI-adjacent platform-confidence bar set by `PHASE-UI-003`/`PHASE-UI-003B`, while keeping the system closed and reduced-motion-safe rather than becoming free-for-all decoration.
+
+**Process note (explicit, for the record):** this was implemented directly by Claude, not Codex — a one-time, explicitly human-authorized override of the standing Claude/Codex role separation in `CLAUDE.md` ("Claude must not freestyle code"). The human confirmed this override twice in the same session after Claude raised the conflict both times (once for the `PHASE-UI-003B` visual taste pass, once for this motion system). This is not a new standing process; future motion work goes back through the normal Claude-plans/Codex-implements/Claude-reviews cycle, using `docs/MOTION_SYSTEM.md` as the binding reference for that work.
+
+**Consequences and conflicts resolved:**
+- The prior "FORBIDDEN: parallax; scroll-triggered fade-up; ambient looping animation; hover lifts on non-interactive elements" list in D18/§I is superseded — those are now ALLOWED, narrowly, through the specific primitives and token caps documented in `MOTION_SYSTEM.md` (`MotionReveal`, `MotionStagger`, `FloatingElement`, `useCursorParallax`, `MotionCounter`, `MotionCard`, `MotionMarquee`), not as a general license.
+- Timing tokens are extended (not just `fast`/`base`/`slow` at 120/200/300ms) — see the updated table in `DESIGN_SYSTEM.md` §I and the canonical values in `src/lib/motion/tokens.ts`.
+- A narrow, named exception to "clay is action-only" (§D) is introduced: brand/clay color may be used as a **progress/connector indicator** (e.g. the lifecycle strip's animated connector line) — nowhere else without a further documented decision.
+- `prefers-reduced-motion` support is now a hard architectural requirement enforced by a shared hook (`useReducedMotionSafe`) that every motion primitive must call — not a per-component afterthought.
+- `framer-motion` is added as a new dependency (`package.json`) — the first UI-layer package added since Phase 2. No second animation library may be introduced; see `MOTION_SYSTEM.md` §12.
+- The two original signature moments (contact reveal, QR check-in flash) are unchanged and remain the only moments permitted to exceed the standard timing budget.
+
 ## Ideas proposed (mine), with build-now/later verdicts
 
 **Build in V1 (cheap, high-leverage):**
