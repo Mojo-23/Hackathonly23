@@ -79,3 +79,8 @@ Goal: architecture agreed before code. DoD: user approves docs, stack, and decis
 ## Sequencing notes
 - Phases 7–10 are largely independent after 6; they can be reordered for demo deadlines (e.g., pull 11 earlier if a pitch needs reports).
 - Cut line for a minimal credible demo: Phases 2–8 + a hand-built report page. Everything after strengthens; nothing before is skippable.
+
+## Design track (runs alongside the feature phases)
+- **DESIGN-000 ✅ (2026-07-11):** Sandstone Editorial direction converted into source-of-truth docs — `docs/DESIGN_SYSTEM.md` created, decision D18 recorded, `COMPONENTS.md` reconciled. Documentation only; no UI code changed.
+- **PHASE-UI-000 (next UI step, must precede any page redesign):** tokens + fonts + primitives only — replace the Phase 2 warm-paper token base in `globals.css` with `DESIGN_SYSTEM.md` §D's white-ground palette (light-only), self-host General Sans + Inter (font asset addition needs human approval), update existing primitives (`Button`, `Card`, `StatusBadge`, `MetricCard`, `EmptyState`, `Skeleton`, `SectionHeader`, layout shells) to the new tokens. **No page redesigns in this task.**
+- **Then surface-by-surface UI tasks**, one route per task, in `DESIGN_SYSTEM.md` §L tier order as features exist; every UI task names `DESIGN_SYSTEM.md` as design authority, attaches 375px + 1280px screenshots, and is reviewed against the closed sets and anti-slop doctrine.

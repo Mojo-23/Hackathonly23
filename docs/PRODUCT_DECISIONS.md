@@ -53,6 +53,19 @@ Prevents the "we emailed you a newer version" chaos. Late-submission grace is an
 ## D17 — Identity creation path: trigger-created profile, onboarding-created contacts
 Canonical account creation is hybrid. A Phase 3 signup trigger creates the minimal `profiles` row immediately when `auth.users` receives a new user, with `profiles.id = auth.uid()` and `full_name` populated from trusted auth metadata (`full_name`, then `name`) or the neutral placeholder `New participant` when metadata is absent. Onboarding must collect the real display name before event registration or matching. `user_contacts` is not trigger-created; onboarding inserts or updates the user's own contact row through the existing self-owned policy, and private contact data remains only in `user_contacts`. The current `profiles_insert_own` policy is scaffolding from `PHASE3C-001`, kept only until the signup trigger is implemented and verified; a later separately approved RLS migration should remove or tighten direct profile inserts. Next task: `PHASE3D-001` should implement the `auth.users` signup trigger described here and keep onboarding responsible for contact-row creation.
 
+## D18 — Sandstone Editorial is the approved V1 visual direction
+**Status: accepted** (DESIGN-000, 2026-07-11). Full specification: `docs/DESIGN_SYSTEM.md`, which is the **source of truth for all future UI tasks** — its closed sets (colors, radii, shadows, type scale, spacing scale) are review-blocking, enforced with the same rigor as RLS.
+
+**Reason:** the product needs one visual system that reads bank-grade to sponsors and genuinely desirable to students, owns competitive whitespace (Devpost is blue, TAIKAI is violet/web3, DoraHacks is dark), and survives a market where organizers supply bad or no imagery. Sandstone Editorial (pure white ground, ink typography, one Petra-clay accent under a rationing law, warm-stone neutrals) delivers all three at low production cost; alternatives "Ink & Olive" and "Signal Ink" were evaluated and rejected.
+
+**Consequences and conflicts resolved:**
+- **V1 is light-only.** Pure white (`#FFFFFF`) replaces the earlier warm-paper default (`#FAF9F6`) wherever they conflict. Dark mode is **not** V1 — this supersedes the earlier "dark mode for organizer surfaces from day one" guidance in `COMPONENTS.md` (now reconciled). One future exception is sanctioned: the organizer scanner screen may be locally dark-styled for dim venues; that is a per-screen style, not a theme.
+- **System-generated event covers are mandatory** — listing/detail quality must never depend on organizer-uploaded media.
+- **No purple/web3 aesthetic**, ever; no gradients, no illustration, no glassmorphism (full ban list in `DESIGN_SYSTEM.md` §K).
+- **The contact reveal is a signature interaction** (blur-to-sharp, ~500ms, protective) — one of exactly two sanctioned theatrical moments (the other: QR check-in success flash).
+- Type system: General Sans (display, marketing only) + Inter (everything in-app), both self-hosted (network-independent build preserved); IBM Plex Sans Arabic reserved for i18n.
+- The Phase 2 token base in `src/app/globals.css` is now out of date by design; it gets replaced in `PHASE-UI-000` (tokens + fonts + primitives only, no page redesigns), which must precede any surface-level UI work.
+
 ## Ideas proposed (mine), with build-now/later verdicts
 
 **Build in V1 (cheap, high-leverage):**

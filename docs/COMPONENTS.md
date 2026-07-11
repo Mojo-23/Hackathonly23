@@ -2,17 +2,19 @@
 
 ## 1. Design system direction
 
-**Identity:** "Event intelligence" — the product should feel like a serious operations tool with a warm public face. Two moods, one system:
-- **Public/participant surface:** editorial, spacious, confident. Big type, real hierarchy, event pages structured like TAIKAI's (hero → key facts strip → timeline → tracks → prizes → rules → CTA) but visually our own.
-- **Organizer/judge/mentor surface:** command-center density. Metric cards, status badges, live tables, warning feed. This is where "premium tool" is proven.
+> **Visual source of truth: `docs/DESIGN_SYSTEM.md` (Sandstone Editorial, decision D18).** This file covers component *architecture* (inventory, code organization, data rules); all visual rules — colors, typography, spacing, radii, shadows, motion, anti-slop doctrine, page direction — live in `DESIGN_SYSTEM.md` and win over anything here if they ever conflict.
 
-**Tokens:**
-- Type: Geist or Inter for Latin; pick an Arabic-compatible companion now (IBM Plex Sans Arabic) so the i18n phase doesn't force a redesign. Strong scale contrast (display 3rem+ vs 0.8125rem table text).
-- Color: near-black ink base (`#0A0A0B` range), warm off-white paper, **one** accent (recommended: a deep desert-amber or Jordan-flag-adjacent crimson used sparingly — status colors do the rest). Dark mode for organizer surfaces from day one (event-day check-in happens in dim halls).
-- Semantic status palette used everywhere: pending / accepted / declined / open / resolved / live / completed — same badge component across all modules; this consistency is what makes it feel like one system.
-- Radius small (6–8px), 1px borders over shadows, generous whitespace on public pages, tight 8px grid on dashboards. No gradient soup, no glassmorphism — that's what "AI-generated-looking" means.
+**Identity:** "Event intelligence" — a serious operations tool with a warm public face. Two registers, one system (defined in `DESIGN_SYSTEM.md` §A):
+- **Public/participant register:** editorial, spacious, confident. Display type, real hierarchy, event pages following the information contract (cover band → facts strip → tracks → timeline → prizes/rules → CTA).
+- **Organizer/judge/mentor register:** command-center density. Metric cards, status badges, live tables, warnings feed — calm, ink-and-stone, numbers-forward.
 
-**Stack:** Tailwind v4 + shadcn/ui as the base primitives (button, dialog, table, form, toast, tabs, badge, command), wrapped in our own domain components below. shadcn code is owned and restyled to our tokens — it will not look like default shadcn.
+**Token summary (full specification and normative rules in `DESIGN_SYSTEM.md` §§D–G):**
+- Ground: pure white (`#FFFFFF`); ink text (`#191714`); one Petra-clay accent (`#A03D21`) under the ≤3-per-screen rationing law; warm-stone neutrals. **Light-only in V1** — no dark mode (the organizer scanner screen may later be locally dark-styled; that is a per-screen style, not a theme). This supersedes the earlier warm-paper/dark-mode guidance that previously lived here.
+- Type: General Sans (display, marketing surfaces only) + Inter (everything in-app), self-hosted; IBM Plex Sans Arabic reserved for i18n. Tabular numerals mandatory wherever data lives.
+- Semantic status palette used everywhere via the single `StatusBadge` component: pending / accepted / declined / open / resolved / live / completed — this consistency is what makes it feel like one system.
+- Closed sets: five radii (6/8/10/14/999), two shadows, 4px spacing scale, three text weights. 1px borders over shadows. No gradients, no glassmorphism, no illustration.
+
+**Stack:** Tailwind v4 + shadcn/ui as the base primitives (button, dialog, table, form, toast, tabs, badge, command), wrapped in our own domain components below. shadcn code is owned and restyled to `DESIGN_SYSTEM.md`'s tokens — it will not look like default shadcn.
 
 ## 2. Component inventory (by domain)
 
@@ -26,7 +28,7 @@
 `Hero` (wedge headline), `HowMatchingWorks` (3-step privacy story), `EventGrid`, `OrganizerPitchSection`, `TrustStrip` (privacy promises), `UniversityLogosRow` (seed-data credibility).
 
 ### Events
-`EventCard` (cover, org, date, mode badge, registration status), `EventHero`, `EventFactsStrip` (date/location/mode/team size), `TrackCard`, `PrizeList`, `RulesSection` (markdown), `EventTimeline`, `RegistrationCTA` (state-aware: open/closed/registered), `PrivacyNote`.
+`EventCard` (system-generated typographic cover per `DESIGN_SYSTEM.md` §C/§H — never dependent on organizer uploads; org, date, mode badge, registration status, fixed anatomy), `EventHero` (system cover band + title lockup), `EventFactsStrip` (date/location/mode/team size), `TrackCard`, `PrizeList`, `RulesSection` (markdown), `EventTimeline`, `RegistrationCTA` (state-aware: open/closed/registered; sticky-bottom on mobile), `PrivacyNote`.
 
 ### Profile & registration
 `ProfileForm` (sectioned: identity, education, skills, links), `SkillsInput` (tag input w/ suggestions), `RoleSelect`, `ConsentCheckboxGroup` (mandatory vs optional visually distinct, links to versioned text), `ConsentHistoryList`, `TalentOptInPanel` (explains exactly what's shared), `RegistrationWizard` (solo vs pre-formed team fork), `TeamInviteCodePanel`.
