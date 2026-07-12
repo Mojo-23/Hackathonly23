@@ -1,149 +1,83 @@
-# Claude Implementation Summary — Public Experience Adoption & Repository Consolidation
+# Claude Implementation Summary — PHASE-AUTH-000: Role-Aware Authentication & Product Architecture
 
 **Date:** 2026-07-12
-**Author:** Claude, acting as Design Authority (per `CLAUDE.md`)
-**Scope:** UI/docs only. No backend, Supabase, database, auth, or package files touched.
+**Author:** Claude, acting as Principal Software Architect / Product Architect (per `CLAUDE.md`'s planner/architect authority for backend and infrastructure work).
+**Scope:** architecture and documentation only. No backend, database, migration, RLS, auth, UI, or package code was written or modified this phase.
 
-This document replaces all prior `CLAUDE_IMPLEMENTATION_SUMMARY.md` content. It is the single authoritative record of the public-experience redesign, its adoption as official, and the repository cleanup that followed. Earlier per-pass summaries are superseded by this file; nothing of substance from them is lost — the decisions they recorded are folded in below or preserved in `handoff/archive/`.
-
----
-
-## 1. What this pass covered
-
-Two things, done together per explicit human instruction:
-
-1. **Four approved review fixes** to the already-implemented public redesign (code hygiene, hero-switcher accessibility, public-nav confirmation, module-rail consistency).
-2. **Official adoption + full repository consolidation**: removing "experimental/prototype" framing repo-wide, auditing for dead/orphaned files, cleaning up `tasks/` and `handoff/`, and aligning docs — all without touching backend, database, or product-boundary decisions.
-
-The binding architecture decision governing all of this (restated below in §5) came directly from the human, not inferred.
+This document replaces all prior `CLAUDE_IMPLEMENTATION_SUMMARY.md` content (the previous version covered the public-experience adoption/consolidation pass, which remains a valid historical record — its substance is preserved in `docs/PHASES.md`'s "Public experience redesign ✅ (adopted)" entry and is not repeated here).
 
 ---
 
-## 2. Exact files changed
+## 1. What this phase covered
 
-### Fix pass (Part 1)
-All four fixes were verified already correctly in place from the immediately preceding turn (re-confirmed via grep, not re-edited this pass):
+The first backend architecture phase after the public experience was officially adopted. Per the phase brief: design the complete authentication and account architecture needed to support Hackathonly's two fundamentally different user journeys (Participant, Organizer) as "two products sharing one platform" — without implementing any of it. This document, its seven companion architecture documents, and the staged future task file are the deliverable.
 
-- `src/app/(public)/participants/page.tsx` — imports grouped at top; `poolAvatars` module constant placed after the import block.
-- `src/app/(public)/page.tsx` — hero view-switcher uses native `<button type="button">` elements with `aria-pressed={activeView === view}`; no `role="tablist"`/`role="tab"`/`aria-selected` remain; focus-visible ring classes and the `AnimatePresence` crossfade preserved.
-- `src/components/layout/site-header.tsx` — public nav is `Hackathons / Participants / Organizers / Blog`; no Dashboard entry; no fake-auth behavior.
-- `src/app/(public)/organizers/page.tsx` — module-rail active state unified with the landing page's `bg-background-inverse` / `text-inverse` treatment (the landing page's implementation was judged stronger and adopted here); zero clay-color classes in the rail.
+## 2. Files created (all new — nothing existing was modified except `docs/PHASES.md`, see §6)
 
-### Consolidation pass (Parts 2–5)
-- `docs/PHASES.md` — "Design track" section updated: `PHASE-UI-000` marked done, new "Public experience redesign ✅ (adopted)" entry added, new "Next planned phase — Role-Aware Authentication and Dashboard Architecture" entry added.
-- `docs/research/TAIKAI_MASTER_DESIGN_REPORT.md` — status banner added ("reference analysis, implementation adopted"). Content otherwise unchanged; kept for its screenshot inventory and craftsmanship-scoring analysis.
-- `docs/research/TAIKAI_IMPLEMENTATION_BRIEF.md` — status banner added ("reference/implementation brief, executed and adopted"). Content otherwise unchanged; kept as the reasoning trail for structural choices.
-- `docs/research/TAIKAI_CLAUDE_CODE_PROMPT.md` — retitled "Document 3 — Ready-to-Send Claude Code Prompt (historical record)"; status banner added ("executed, historical record — do not re-run"), noting that current implementation and `docs/DESIGN_SYSTEM.md`/`docs/MOTION_SYSTEM.md` win over anything in this prompt if they conflict. Kept in place (not moved) — a clear banner was judged sufficient to prevent misreading it as a live directive; moving/renaming risked breaking any path references without adding real benefit.
-- `tasks/current-task.md` — reset from a stale, already-superseded task description to a clean "No active task" placeholder pointing at this file.
+| File | Purpose |
+|---|---|
+| `docs/architecture/DECISIONS.md` | The executive ADR — ten numbered decisions (AD-1 through AD-10), each with alternatives considered, chosen approach, and rationale |
+| `docs/architecture/AUTH_ARCHITECTURE.md` | Provider/methods, identity model detail, full auth lifecycle, post-login routing table |
+| `docs/architecture/ROLE_MODEL.md` | The four-scope contextual role model (platform/identity/organization/event), capability matrix |
+| `docs/architecture/DASHBOARD_ARCHITECTURE.md` | Participant vs. Organizer dashboard information architecture, why they're two experiences not one |
+| `docs/architecture/PRODUCT_FLOWS.md` | Navigation surfaces, workspace/org switchers, routing/redirect table, deep links, return-URL security |
+| `docs/architecture/FUTURE_DATABASE_PLAN.md` | Full table-group inventory (existing groups summarized + new items this phase requires), no SQL |
+| `docs/architecture/RLS_STRATEGY.md` | Narrative RLS strategy, the "workspace is UI, not RLS" principle, one flagged open policy question |
+| `tasks/PHASE-AUTH-001.md` | Staged (not active) future Codex implementation task — requirements only, no code, explicitly blocked on human approval |
 
-### File moves (see §3 for justification)
-- `handoff/CODEX_SUMMARY.md` → `handoff/archive/CODEX_SUMMARY-motion-system-D19.md`
-- `handoff/FABLE_SUMMARY.md` → `handoff/archive/FABLE_SUMMARY-DESIGN-000.md`
-- `handoff/WORKFLOW_TEST.md` → `handoff/archive/WORKFLOW_TEST.md`
-- Full original content of `tasks/current-task.md` (the stale `PHASE-UI-003B` task) → `tasks/archive/PHASE-UI-003B.md`, with an appended "Archive note" explaining why it's superseded.
+## 3. Decisions made (summary — full reasoning in `docs/architecture/DECISIONS.md`)
 
-### This file and its counterpart
-- `handoff/CLAUDE_IMPLEMENTATION_SUMMARY.md` — rewritten in full (this file), replacing the prior `PHASE-UI-004` organizer-landing-surface summary.
-- `handoff/CLAUDE_REVIEW.md` — rewritten in full (companion document).
+1. **Identity model:** one identity per person, for life. No account fork. "Organizer" is not a stored role — it's derived from `organization_members` membership, which already exists in the schema. One new field, `profiles.default_workspace`, records which dashboard a user defaults to; it confers no permission.
+2. **Signup flow:** ratifies the existing hybrid email+password + Google decision (`docs/ARCHITECTURE.md` §3). Account-type (workspace) choice happens during onboarding, after identity basics, not before or immediately at signup.
+3. **Role model:** four independent, differently-scoped layers — platform (`platform_admins`), identity (`default_workspace`, UX-only), organization (`organization_members.role`: owner/admin/staff), event (`event_roles.role`, recommended extension to add `staff`/`volunteer`). No generic permissions engine. Sponsor Viewer explicitly excluded — ratifies `docs/PRODUCT_DECISIONS.md` D3 (no sponsor auth role).
+4. **Organizations:** unchanged — multi-org, multi-admin, multi-membership already supported by the existing schema. One real gap found: no invite mechanism exists yet (`organization_invites` is a new required table).
+5. **Dashboards:** two independent route-group experiences (`(participant)`, `(organizer)` — already the shape `docs/ROUTES.md` committed to) sharing one design system, not one dashboard with a role flag.
+6. **Navigation:** role-aware nav, workspace switcher (visible only if ≥1 org membership) and org switcher (visible only if ≥2 orgs), all server-enforced, with a validated `next` return-URL pattern.
+7. **Database planning:** `docs/DATABASE.md` remains authoritative for everything it already specifies (12 table groups, 16 data flows). This phase adds only: `profiles.default_workspace`, `organization_invites`, optionally `profiles.last_active_organization_id`, an `event_roles` enum extension, and flags a future Notifications group as a documented gap (not built).
+8. **RLS strategy:** existing deny-by-default, contextual-helper-function pattern (`docs/RLS_ACCESS_MATRIX.md`) holds unchanged. Core new principle made explicit: workspace/UI context must never be read by any RLS policy — authorization is always derived from `auth.uid()` plus membership tables. One open product-policy question flagged, not resolved: should an organizer be allowed to register as a participant or serve as a judge in their own organization's event? (Recommendation given, human sign-off required before any enforcement is built.)
+9. **Auth lifecycle:** existing lifecycle (`docs/ROUTES.md`, `docs/ARCHITECTURE.md`) ratified; onboarding gains the workspace-choice step and, conditionally, an organization-creation-or-invite-acceptance step.
+10. **Future scalability:** the identity/role/organization model is already geography- and org-type-agnostic. Two additive fields (`hackathons.visibility`, `hackathon_invites`) are recommended for a later phase to fully cover private/company-internal events — neither required now, neither changes anything existing.
 
-No `src/lib/**`, `public/images/**`, package, or backend files required changes in this pass — all were audited (§4) and found to already be correct or out of scope.
+## 4. Alternatives rejected (see `docs/architecture/DECISIONS.md` for full reasoning on each)
 
----
+- **Hard account fork at signup** (permanent Participant-or-Organizer account type) — rejected, breaks the dual-role requirement and is expensive to unwind later for real users.
+- **Global mutable `role` column** on `profiles` — rejected, duplicates what `organization_members` already tells you and risks drifting out of sync.
+- **Generic fine-grained permissions engine** (configurable ACL tables) — rejected as over-engineering for the actual scale and needs; four contextual scopes using existing tables are sufficient.
+- **One dashboard with role-conditional modes** — rejected; contradicts the phase brief's own "two products sharing one platform" framing and tends toward either an unmanageable branching component or a de-facto two-app split with worse routing.
+- **Two fully independent applications/deployments** — rejected as overkill; one Next.js app with two route groups (already the existing shape) achieves the separation without operational duplication.
+- **Choosing account type before or immediately at signup** — rejected; both add friction or force a premature/adversarial framing for a person who may turn out to be both participant and organizer.
+- **Persisting "current workspace" server-side as an authorization signal** — rejected; workspace must remain a client-side UX convenience only, never trusted by RLS (this is the single most important guardrail this phase establishes for future implementers).
 
-## 3. Exact files deleted (moved to archive) and why each was safe
+## 5. Risks and open questions
 
-Nothing was permanently deleted; three handoff files and one task file were moved to `archive/` locations, which is equivalent to deletion from the *active* namespace while preserving history. Each was checked against the required 6-point test before moving:
+- **Organizer-as-participant / organizer-as-judge conflict of interest** (`docs/architecture/RLS_STRATEGY.md` §6) — genuinely open, requires a human product-policy decision before `PHASE-AUTH-001` or any later phase implements judge-assignment enforcement. A recommendation is given (allow self-registration with a visible "organizer of this event" flag; disallow self-judging by default) but is explicitly not treated as decided.
+- **`organization_invites` is new schema, not previously anywhere in `docs/DATABASE.md`** — a genuine gap found during this phase, not a redesign of anything that worked before. Flagged clearly so it isn't mistaken for scope creep when `PHASE-AUTH-001` eventually builds it.
+- **Notifications** is a foreseeable near-future table group with zero design yet — deliberately deferred, not designed here, to avoid inventing it ad hoc without its own ADR later.
+- **Exact UX treatment** of the workspace/org switchers (dropdown vs. pill vs. modal, copy, placement) is explicitly left to a future Design Authority pass — this phase specifies visibility rules and behavior only, not visuals.
 
-| File | Imported/referenced? | Part of a live route? | Required by build/tests/docs? | Only historical record? | Superseded by another file? | Deletion/move would harm maintenance? |
-|---|---|---|---|---|---|---|
-| `handoff/CODEX_SUMMARY.md` | No | No | No — `scripts/run-codex-task.ps1` only checks for this path *after* a future real Codex run completes, not as a standing dependency | Yes — one-time D19 motion-system record, self-disclosed as implemented by Claude not Codex | N/A | No — content fully preserved at new path, cross-referenced |
-| `handoff/FABLE_SUMMARY.md` | No | No | No | Yes — one-time DESIGN-000 doc-creation record | N/A | No — preserved |
-| `handoff/WORKFLOW_TEST.md` | No | No | No | Yes — one-time pipeline dry-run artifact | N/A | No — preserved |
-| `tasks/current-task.md` (old content) | No | No | No — task file is meant to hold only the *current* task | Yes — describes a task that was never executed as written; superseded by the actual implementation | Yes — by the shipped public redesign | No — full original text preserved verbatim in `tasks/archive/PHASE-UI-003B.md` with an explanatory note |
+## 6. Documentation touched
 
-Confirmed via grep that `scripts/run-codex-task.ps1` treats `handoff/CODEX_SUMMARY.md` as an output path written by a future Codex run, not a required input — moving the stale copy does not break automation; the next real Codex task will simply write a fresh one.
+- `docs/PHASES.md` — no change required this phase; the "Next planned phase — Role-Aware Authentication and Dashboard Architecture" entry already added in the prior consolidation pass correctly anticipated this work and needs no edit. Verified by re-reading it before starting this phase.
+- All seven new `docs/architecture/*.md` files are new; nothing in `docs/DATABASE.md`, `docs/RLS_ACCESS_MATRIX.md`, `docs/PRODUCT_DECISIONS.md`, `docs/PRIVACY_MODEL.md`, `docs/ROUTES.md`, or `docs/ARCHITECTURE.md` was edited — every decision in this phase either ratifies what those documents already say (called out explicitly, decision by decision, in `DECISIONS.md`) or adds something genuinely new without contradicting them. This was verified by reading all six of those documents in full before writing anything.
 
----
+## 7. Recommended implementation order
 
-## 4. Repository hygiene audit results
+1. **`PHASE-AUTH-001`** (staged at `tasks/PHASE-AUTH-001.md`, not active) — schema foundation (`default_workspace`, `organization_invites`, optionally `last_active_organization_id`) + onboarding flow + routing/redirect middleware. No dashboard UI.
+2. **A follow-up phase** (not yet drafted) — Participant Dashboard content, built against the now-real `default_workspace`/routing foundation.
+3. **A follow-up phase** (not yet drafted) — Organizer Dashboard content, including the org switcher UI and the command-center surface already specified in `docs/ROUTES.md`/`docs/ARCHITECTURE.md`.
+4. **Only after both dashboards exist and are stable:** the `event_roles` enum extension (`staff`, `volunteer`) and the organizer-conflict-of-interest policy decision from `RLS_STRATEGY.md` §6 — neither blocks 1–3, so both should wait rather than add scope to the foundation task.
 
-Audited per the required 6-point test: `src/app/(public)/**`, `src/components/**`, `src/lib/**`, `public/images/**`, `docs/**`, `docs/research/**`, `handoff/**`, `tasks/**`.
+## 8. What Codex will implement first, and what should wait
 
-- **Duplicate cover-resolution logic:** none found. `src/lib/event-cover.ts` (`coverPhotoBySlug`, `coverTone`, `getCoverTone`) and `src/components/events/theme-cover-icon.tsx` (`ThemeCoverIcon`) are the single source of truth, consumed consistently by `EventCard`, `event-detail-content.tsx`, and `blog/page.tsx`. No dead code removed here because none exists.
-- **Image assets (`public/images/**`):** all 6 files (`events/*.jpg` ×3, `avatars/*.jpg` ×3) confirmed referenced via grep — zero orphans. `SOURCE.md` manifest kept as-is; no runtime hotlinks found (confirmed again this pass, see §7).
-- **Motion primitives (`src/components/motion/motion-marquee.tsx`):** flagged by the zero-reference heuristic (no current page imports it), but **intentionally kept**, not deleted — it is documented in `docs/MOTION_SYSTEM.md` as a ready-but-unused primitive for a future logo/social-proof row, not an accidental leftover. Per explicit instruction, documented motion-system primitives are not to be deleted just because they're not yet consumed.
-- **`src/lib/supabase/{admin,client,server}.ts`:** flagged by the orphan-check heuristic (low reference count relative to their surface) but correctly identified as backend files, explicitly out of scope for this UI/docs-only pass, and left untouched.
-- **Core docs (`docs/DESIGN_SYSTEM.md`, `docs/MOTION_SYSTEM.md`, `docs/PRODUCT_DECISIONS.md`, `CLAUDE.md`):** grepped for experimental-framing language ("experiment," "prototype-only," "temporary," "proposed direction," etc.) — zero matches. Left untouched.
-- **Generic tooling docs** (`.agents/skills/**`, `.claude/skills/**`) matched the "experiment" grep on generic, project-unrelated skill documentation — explicitly left untouched as out of scope.
-- **Routes:** no route was deleted or renamed. `/events` remains `/events` (nav label reads "Hackathons," route unchanged, per explicit instruction not to rename it this pass). All previously-existing routes still build (see §7).
+**First (once approved):** `PHASE-AUTH-001` exactly as scoped in `tasks/PHASE-AUTH-001.md` — schema + onboarding + routing, nothing more. Both required approvals (migration, RLS) are explicitly marked **not yet given** in that file; a human must approve them before Codex starts.
 
-**Net result:** no source code was deleted this pass. The only removals were the three stale one-time handoff artifacts and the one stale task description, all moved to `archive/` locations with full content preserved, per §3 above.
-
----
-
-## 5. Binding product/architecture decision (restated, not modified)
-
-This decision came directly from the human this pass and governs everything above and everything in the "Next Phase" section below. It is **not new**, only restated and preserved:
-
-- Anonymous visitors must never see a Dashboard link or Dashboard content.
-- At signup/onboarding, a user chooses **Participant** or **Organizer**.
-- These lead to **completely separate** authenticated experiences: a Participant Dashboard and an Organizer Dashboard — not one dashboard with role-conditional sections.
-- All role-aware auth, database schema, migrations, RLS, route protection, and redirects are **explicitly out of scope for this and all prior UI-only passes**. They belong to a future, separately-approved backend phase (§8 below).
-- Whether a person can hold both roles simultaneously in the future is an open question to be resolved when that backend phase is scoped — no assumption about it has been made or implemented here.
-- No database or RLS assumptions have been introduced anywhere in this pass.
+**Should wait:**
+- Any dashboard UI (needs its own task and, likely, Design Authority involvement for the switcher components).
+- The `event_roles` enum extension (`staff`, `volunteer`) — no consumer for it yet.
+- Any enforcement of the organizer-conflict-of-interest question — needs a human product decision first, not just a technical implementation.
+- `hackathons.visibility` / `hackathon_invites` / `organizations.category` — all explicitly future-scalability items, no current product need.
+- A Notifications table group — undesigned, would be invented ad hoc if built now.
 
 ---
 
-## 6. Official adoption statement (Part 2/5 requirement)
-
-The following is now the official position, replacing any prior "experimental" framing:
-
-- The current public experience — landing (`/`), `/organizers`, `/participants`, `/blog`, `/events`, `/events/[slug]`, and the shared header/footer — **is the approved, adopted Hackathonly design.** It is not a prototype, a temporary clone, a test redesign, or a proposed direction awaiting further approval.
-- TAIKAI (`docs/research/`) remains documented purely as a **structural and craftsmanship reference** that informed layout, motion, and interaction-pattern decisions. It is not a branding source — no TAIKAI assets, copy, purple, or logos exist anywhere in this repository.
-- Hackathonly remains an independent product and brand.
-- Future design work **evolves this implementation** — it does not revert to the earlier, flatter pre-redesign design.
-- Nav (`Hackathons / Participants / Organizers / Blog`) is the official public navigation. Dashboard is intentionally absent from public nav — see §5.
-
-Repo-wide search for experimental-framing language ("experiment," "experimental," "prototype-only," "temporary TAIKAI clone," "taikai-style-clone," "proposed direction," "one-time comparison," "test redesign," "old public design," "pre-experiment design") found matches only in `docs/research/*` (now banner-updated, §2) and the branch name `experiment/taikai-style-clone` itself (a git ref, outside the scope of a file-content pass — flagged as remaining technical debt in `CLAUDE_REVIEW.md`).
-
----
-
-## 7. Verification results (Part 7)
-
-All run after every file change/move in this pass:
-
-- `npm run build` — **passed.** All 14 pages generated successfully. Routes confirmed present: `/`, `/_not-found`, `/blog`, `/dashboard`, `/events`, `/events/[slug]` (SSG, 3 static params: `jordan-ai-builders-hackathon`, `usj-fintech-sprint`, `psut-hardware-hack`), `/organizer/events/[eventId]` (dynamic), `/organizers`, `/participants`, `/privacy`, `/terms`. `/events/[slug]` confirmed still prerendered via `generateStaticParams` (● SSG marker in build output).
-- `npx tsc --noEmit` — **passed**, zero errors.
-- `npx eslint .` — **passed**, zero errors/warnings.
-- `powershell -ExecutionPolicy Bypass -File scripts/verify.ps1` — **passed** all steps: build, typecheck, lint, and the `profile_id` forbidden-string scan.
-- Raw-hex scan (`#[0-9a-fA-F]{3,8}`) across `src/**/*.tsx` — **zero matches.**
-- Hotlink scan (`images.unsplash.com`, `pravatar`) across `src/` — **zero matches.** All imagery is local (`public/images/`).
-- `profile_id` scan repo-wide (`.ts`, `.tsx`, `.sql`, `.md`) — matches exist only inside documentation *describing the naming rule itself* (`CLAUDE.md`, `docs/PRODUCT_DECISIONS.md`, `docs/DATABASE.md`, `docs/ARCHITECTURE.md`, `WORKFLOW.md`, `AGENTS.md`, `tasks/TASK_TEMPLATE.md`, `tasks/archive/WORKFLOW-TEST-001.md`, `docs/PHASES.md`, and both handoff files) — no file uses `profile_id` as an actual identifier. Zero real occurrences.
-- Backend/package scope check (`git status --porcelain -- package.json package-lock.json supabase/ src/app/api/`) — **empty output.** Zero changes to package files, Supabase config, or API routes.
-- Broken-import check — covered by clean `tsc`/`eslint` results post-file-move; no import references any of the moved/archived files.
-- Unreferenced-deleted-asset check — no assets were deleted this pass (only handoff/task docs were archived, and nothing references them by path except this summary and the archive files themselves).
-- Public nav, hero-switcher accessibility (`aria-pressed`, keyboard operability, focus-visible rings), and reduced-motion gating (`useReducedMotionSafe()`) — all re-confirmed intact via source inspection; no regressions introduced.
-
----
-
-## 8. Next Phase — Role-Aware Authentication and Dashboard Architecture
-
-This is the next planned phase, **not yet scoped into a task file**, and **not implemented in this pass**. It is backend/infrastructure work and follows the standing Claude-plans/Codex-implements/Claude-reviews workflow — not direct Claude implementation.
-
-Requirements for whoever scopes this phase:
-
-- Signup/onboarding must ask the user to choose **Participant** or **Organizer**.
-- A Participant account gets a **Participant Dashboard**. An Organizer account gets a **completely separate Organizer Dashboard.** These are not the same view with conditional sections.
-- Anonymous (unauthenticated) visitors must never see a Dashboard link or be able to reach Dashboard content.
-- Once authenticated, the site nav becomes role-aware (distinct from the current public nav documented in §6).
-- **Role enforcement must be server-side** (middleware/RLS/route guards) — client-side UI conditionals alone are not acceptable and would be a privacy/security defect, not just a UX gap.
-- Required backend work: database schema changes, migrations, RLS policies, organization-ownership modeling, route protection, and post-auth redirects. Per `CLAUDE.md`, **database migrations and RLS/contact-reveal logic require explicit human approval** before any task authorizing them is written — none has been given as of this pass.
-- Open design question to resolve when this phase is scoped: **can a single person hold both Participant and Organizer roles**, either simultaneously or by switching context? No assumption has been made either way in this pass.
-- No implementation assumptions about any of the above have been silently introduced during this UI-only phase — this section is a requirements list for the next planning pass, not a preview of decisions already made.
-
----
-
-## 9. Remaining technical debt
-
-- The git branch name `experiment/taikai-style-clone` still contains "experiment" — a content-level pass cannot rename a git ref; flagged here and in `CLAUDE_REVIEW.md` for human decision (rename vs. merge to `main` vs. leave as-is, since it currently points to the same commit as `main` and all real work is uncommitted working-tree changes — see `CLAUDE_REVIEW.md` for the full note).
-- No uncommitted changes have been committed this pass, per explicit instruction — `git status` above still shows every file listed in §2 as modified/moved but unstaged.
+No backend, database, migration, RLS, auth, frontend, or package file was created, modified, or deleted this phase, other than the eight new documentation/task files listed in §2. Nothing was committed or pushed.
