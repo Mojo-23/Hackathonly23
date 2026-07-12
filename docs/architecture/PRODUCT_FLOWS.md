@@ -33,9 +33,11 @@ Extends `AUTH_ARCHITECTURE.md` §5 with the deep-link and return-URL cases:
 |---|---|
 | Anonymous visits `/dashboard` or `/organizer/*` directly | Redirect to `/auth?next=<original path>` |
 | Anonymous clicks "Register" on an event page | Redirect to `/auth?next=/events/[slug]/register`; after auth, land on the registration step directly, not the default dashboard |
-| Authenticated participant visits `/organizer/*` with 0 org memberships | Redirect to `/organizer/onboarding` (create-or-join-org) — never a blank/broken organizer shell |
+| Authenticated, `initial_onboarding_completed_at is null` (`AUTH_ARCHITECTURE.md` §4a) | Routed to the onboarding workspace-choice step, regardless of destination — this check happens before any of the rows below are consulted, and before any `next` value is honored |
+| Authenticated participant visits `/organizer/*` with 0 org memberships | Redirect to the organizer creation-or-recovery flow (`AUTH-002A` scope) — never a blank/broken organizer shell, and never `/dashboard` as a silent fallback (`DECISIONS.md` AD-11 Decision 2) |
 | Authenticated participant visits `/organizer/*` with ≥1 org membership | Allowed — this is exactly the dual-role case; org membership, not `default_workspace`, gates access |
-| Authenticated organizer-default user with 0 orgs, first login | Land on `/organizer/onboarding` automatically (per `AUTH_ARCHITECTURE.md` §5 table) |
+| Authenticated organizer-default user with 0 orgs, first login | Land on the organizer creation-or-recovery flow automatically (per `AUTH_ARCHITECTURE.md` §5 table) |
+| Authenticated organizer-default (or dual-role) user with ≥1 org membership | Land on **`/organizer`** — the real, canonical organizer home (`AUTH-002-PRE`, `src/app/organizer/page.tsx`), not a placeholder or a different route standing in for it |
 | Authenticated user visits a specific `/organizer/events/[eventId]/*` they are not a member of that event's org | 403 / not-found treatment (exact UX — 404 vs. "request access" — is an implementation-phase UX decision, not fixed here); never silently reveal the event exists to non-members beyond what public `/events/[slug]` already shows if published |
 | `next` parameter present but points off-site or to a non-existent internal route | Ignored; fall back to the default routing table in `AUTH_ARCHITECTURE.md` §5 |
 | Logout from either workspace | Session cleared, client-side workspace preference cleared, redirect to `/` |

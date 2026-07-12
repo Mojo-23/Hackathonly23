@@ -33,7 +33,7 @@ Single-tenant: everything on this dashboard is scoped to "me," never to an organ
 
 Multi-tenant: everything is scoped first to an organization, then to an event within it. Structure (ratifying `docs/ROUTES.md` §Organizer, unchanged by this phase):
 
-- **Org home (`/organizer`):** which organization (switcher if ≥2), events list, org settings, org members.
+- **Org home (`/organizer`):** which organization (switcher if ≥2), events list, org settings, org members. **A real, minimal version of this route now exists** (`src/app/organizer/page.tsx`, built `AUTH-002-PRE`, human-approved 2026-07-12 as the canonical organizer destination — `DECISIONS.md` AD-11 Decision 2) — an honest workspace-ready shell with no mock event data, no organization-creation form, and no dead links, explicitly scoped as a starting shell for later phases to build the events list, org settings, and member management onto. It is not a placeholder to be thrown away; it is the first real increment of this section.
 - **Command center (`/organizer/events/[eventId]`):** the existing, already-specified metric-grid + warnings-feed surface (`docs/ARCHITECTURE.md` §6, `docs/ROUTES.md` §Organizer) — unchanged by this phase.
 - All of the existing organizer sub-routes (participants, matching, check-in, submissions, judging, mentor-requests, reports, sponsor-report, talent, exports, settings) — unchanged.
 

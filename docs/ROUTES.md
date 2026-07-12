@@ -16,7 +16,7 @@ Next.js App Router. Route groups: `(public)`, `(auth)`, `(participant)`, `(organ
 ## Auth — `(auth)` (planned)
 | Route | Purpose |
 |---|---|
-| `/auth` | Future approved login destination. Not implemented as a page in the repo yet; protected-route redirects may still target it with a validated `next` value. |
+| `/auth` | Future approved login destination. Not implemented as a page in the repo yet; protected-route redirects may still target it with a validated `next` value. Email verification policy (`AUTH-002-PRE`, human-approved): local development may keep confirmation disabled (`supabase/config.toml` `enable_confirmations = false`) for practical testing; production requires email verification before a user may complete initial onboarding. Not implemented by this phase — a future hosted-configuration concern. |
 | `/auth/callback` | Planned OAuth/code exchange route handler. Not implemented yet. |
 | `/onboarding` | Planned first-login profile completion. Not implemented yet. |
 
@@ -37,7 +37,7 @@ Next.js App Router. Route groups: `(public)`, `(auth)`, `(participant)`, `(organ
 ## Organizer — `(organizer)`, requires org membership
 | Route | Purpose |
 |---|---|
-| `/organizer` | Planned org home: events list, org settings, members. No page exists yet, but the route family is protected by server proxy. |
+| `/organizer` | **Built** — the canonical organizer home (`AUTH-002-PRE`). Currently a minimal, honest workspace-ready shell (no mock event data, no organization-creation form, no dead links); events list, org settings, and member management are planned additions on top of this real shell, not yet built. Protected by `src/proxy.ts` (unchanged from `AUTH-001`). |
 | `/organizer/events`, `/organizer/events/new` | Planned: manage / create event. Not implemented yet. |
 | `/organizer/events/[eventId]` | Built placeholder command-center route over mock data. Unauthenticated requests redirect to `/auth?next=<original path>`; authenticated users with zero `organization_members` rows redirect to `/dashboard`. |
 | `/organizer/events/[eventId]/participants` | Planned: table, status changes, consent flags, CSV export. Not implemented yet. |

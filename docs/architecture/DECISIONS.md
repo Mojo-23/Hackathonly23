@@ -147,6 +147,22 @@ Full detail in `RLS_STRATEGY.md`.
 
 ---
 
+---
+
+## AD-11 — First-run onboarding signal and canonical organizer destination (human-approved 2026-07-12, `AUTH-002-PRE`)
+
+**Question, surfaced by `AUTH-002A`'s architecture-decision gate, not by the original ten:** how is a first-time user (needs the workspace-choice onboarding step) distinguished from a returning user, given `default_workspace` always has a value? And: the routing table names `/organizer` as the organizer landing destination, but does that route actually exist?
+
+**Decision 1 — persisted first-run signal.** `profiles.initial_onboarding_completed_at timestamptz null` — approved for `AUTH-002A` implementation under a separately approved migration; **not implemented by `AUTH-002-PRE`**. `null` means the first-run workspace-choice step has not been completed; a timestamp means it has. Alternatives considered: a generic `onboarding_completed` boolean (rejected — the timestamp is no more expensive to store and is more useful for audit/support than a boolean, and "onboarding" as a single boolean invites conflating this narrow first-run signal with the much larger, later participant-profile-completeness concern); inferring first-run status from existing signals like the `full_name` placeholder (rejected — unreliable for Google signups, which get a real name immediately, and was never an approved semantic); no persisted signal at all, relying on the signup code path alone (rejected — unreliable for OAuth, where the callback route can't cleanly distinguish new from returning without a fragile heuristic). Full semantics in `AUTH_ARCHITECTURE.md` §4a — critically, this field is **not** participant profile completeness (that's `PROFILE-001`/`PROFILE-002`, later), and **not** authorization (same rule as `default_workspace`, AD-1).
+
+**Decision 2 — `/organizer` is the canonical, real organizer destination, built now, not deferred.** The routing table (`AUTH_ARCHITECTURE.md` §5) already named `/organizer` as the landing route for an organizer-first user with ≥1 membership, but `docs/ROUTES.md` (post-`AUTH-001`) recorded it as not yet built — a real gap the gate caught before `AUTH-002A` could build an organizer-onboarding action with nowhere real to redirect to. Alternative considered and explicitly rejected: redirecting a freshly-bootstrapped organizer to `/dashboard` as a temporary fallback until a real `/organizer` page shipped. Rejected because it would violate AD-5's "two separate products" framing at exactly the moment it matters most (a brand-new organizer's very first landing) and because a fallback like this tends to become permanent by inertia. Resolved instead by building a real, minimal, honest `/organizer` workspace shell in `AUTH-002-PRE` itself (`src/app/organizer/page.tsx`) — no mock data, no dead buttons, an honest "workspace ready" empty state — so the canonical destination genuinely exists before any onboarding action is built to redirect to it.
+
+**Decision 3 — email verification policy, environment-scoped.** Local development may run with `enable_confirmations = false` (already true of this repo's `supabase/config.toml`) for practical automated testing. Production requires email verification to complete before a user may complete initial onboarding (i.e., before `initial_onboarding_completed_at` may be set). This is a policy statement for a future hosted-environment configuration pass, not something `AUTH-002-PRE` or any local-only phase implements — no hosted Supabase configuration was touched, no remote command was run, no production key was introduced.
+
+**Consequences:** `AUTH-002A` may now proceed to specify the migration adding `initial_onboarding_completed_at` and the organizer-onboarding action's redirect target (`/organizer`, now real) without either of the two gaps that previously blocked it.
+
+---
+
 ## Summary table
 
 | # | Topic | Decision | New schema this phase implies (not built) |

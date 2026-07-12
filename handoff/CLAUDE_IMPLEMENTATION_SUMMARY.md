@@ -1,83 +1,72 @@
-# Claude Implementation Summary — PHASE-AUTH-000: Role-Aware Authentication & Product Architecture
+# Claude Implementation Summary — AUTH-002-PRE: Onboarding Gate and Organizer Entry
 
 **Date:** 2026-07-12
-**Author:** Claude, acting as Principal Software Architect / Product Architect (per `CLAUDE.md`'s planner/architect authority for backend and infrastructure work).
-**Scope:** architecture and documentation only. No backend, database, migration, RLS, auth, UI, or package code was written or modified this phase.
+**Author:** Claude, acting as Design/Architecture Authority (per `CLAUDE.md`'s Design Engineer role for the UI portion, and planner/architect authority for the documentation portion — both directly implemented per explicit human approval in this task's brief, not delegated to Codex).
+**Scope:** architecture documentation + one real, non-visual-marketing UI route. No backend, database, migration, RLS, proxy, or package file touched.
 
-This document replaces all prior `CLAUDE_IMPLEMENTATION_SUMMARY.md` content (the previous version covered the public-experience adoption/consolidation pass, which remains a valid historical record — its substance is preserved in `docs/PHASES.md`'s "Public experience redesign ✅ (adopted)" entry and is not repeated here).
-
----
-
-## 1. What this phase covered
-
-The first backend architecture phase after the public experience was officially adopted. Per the phase brief: design the complete authentication and account architecture needed to support Hackathonly's two fundamentally different user journeys (Participant, Organizer) as "two products sharing one platform" — without implementing any of it. This document, its seven companion architecture documents, and the staged future task file are the deliverable.
-
-## 2. Files created (all new — nothing existing was modified except `docs/PHASES.md`, see §6)
-
-| File | Purpose |
-|---|---|
-| `docs/architecture/DECISIONS.md` | The executive ADR — ten numbered decisions (AD-1 through AD-10), each with alternatives considered, chosen approach, and rationale |
-| `docs/architecture/AUTH_ARCHITECTURE.md` | Provider/methods, identity model detail, full auth lifecycle, post-login routing table |
-| `docs/architecture/ROLE_MODEL.md` | The four-scope contextual role model (platform/identity/organization/event), capability matrix |
-| `docs/architecture/DASHBOARD_ARCHITECTURE.md` | Participant vs. Organizer dashboard information architecture, why they're two experiences not one |
-| `docs/architecture/PRODUCT_FLOWS.md` | Navigation surfaces, workspace/org switchers, routing/redirect table, deep links, return-URL security |
-| `docs/architecture/FUTURE_DATABASE_PLAN.md` | Full table-group inventory (existing groups summarized + new items this phase requires), no SQL |
-| `docs/architecture/RLS_STRATEGY.md` | Narrative RLS strategy, the "workspace is UI, not RLS" principle, one flagged open policy question |
-| `tasks/PHASE-AUTH-001.md` | Staged (not active) future Codex implementation task — requirements only, no code, explicitly blocked on human approval |
-
-## 3. Decisions made (summary — full reasoning in `docs/architecture/DECISIONS.md`)
-
-1. **Identity model:** one identity per person, for life. No account fork. "Organizer" is not a stored role — it's derived from `organization_members` membership, which already exists in the schema. One new field, `profiles.default_workspace`, records which dashboard a user defaults to; it confers no permission.
-2. **Signup flow:** ratifies the existing hybrid email+password + Google decision (`docs/ARCHITECTURE.md` §3). Account-type (workspace) choice happens during onboarding, after identity basics, not before or immediately at signup.
-3. **Role model:** four independent, differently-scoped layers — platform (`platform_admins`), identity (`default_workspace`, UX-only), organization (`organization_members.role`: owner/admin/staff), event (`event_roles.role`, recommended extension to add `staff`/`volunteer`). No generic permissions engine. Sponsor Viewer explicitly excluded — ratifies `docs/PRODUCT_DECISIONS.md` D3 (no sponsor auth role).
-4. **Organizations:** unchanged — multi-org, multi-admin, multi-membership already supported by the existing schema. One real gap found: no invite mechanism exists yet (`organization_invites` is a new required table).
-5. **Dashboards:** two independent route-group experiences (`(participant)`, `(organizer)` — already the shape `docs/ROUTES.md` committed to) sharing one design system, not one dashboard with a role flag.
-6. **Navigation:** role-aware nav, workspace switcher (visible only if ≥1 org membership) and org switcher (visible only if ≥2 orgs), all server-enforced, with a validated `next` return-URL pattern.
-7. **Database planning:** `docs/DATABASE.md` remains authoritative for everything it already specifies (12 table groups, 16 data flows). This phase adds only: `profiles.default_workspace`, `organization_invites`, optionally `profiles.last_active_organization_id`, an `event_roles` enum extension, and flags a future Notifications group as a documented gap (not built).
-8. **RLS strategy:** existing deny-by-default, contextual-helper-function pattern (`docs/RLS_ACCESS_MATRIX.md`) holds unchanged. Core new principle made explicit: workspace/UI context must never be read by any RLS policy — authorization is always derived from `auth.uid()` plus membership tables. One open product-policy question flagged, not resolved: should an organizer be allowed to register as a participant or serve as a judge in their own organization's event? (Recommendation given, human sign-off required before any enforcement is built.)
-9. **Auth lifecycle:** existing lifecycle (`docs/ROUTES.md`, `docs/ARCHITECTURE.md`) ratified; onboarding gains the workspace-choice step and, conditionally, an organization-creation-or-invite-acceptance step.
-10. **Future scalability:** the identity/role/organization model is already geography- and org-type-agnostic. Two additive fields (`hackathons.visibility`, `hackathon_invites`) are recommended for a later phase to fully cover private/company-internal events — neither required now, neither changes anything existing.
-
-## 4. Alternatives rejected (see `docs/architecture/DECISIONS.md` for full reasoning on each)
-
-- **Hard account fork at signup** (permanent Participant-or-Organizer account type) — rejected, breaks the dual-role requirement and is expensive to unwind later for real users.
-- **Global mutable `role` column** on `profiles` — rejected, duplicates what `organization_members` already tells you and risks drifting out of sync.
-- **Generic fine-grained permissions engine** (configurable ACL tables) — rejected as over-engineering for the actual scale and needs; four contextual scopes using existing tables are sufficient.
-- **One dashboard with role-conditional modes** — rejected; contradicts the phase brief's own "two products sharing one platform" framing and tends toward either an unmanageable branching component or a de-facto two-app split with worse routing.
-- **Two fully independent applications/deployments** — rejected as overkill; one Next.js app with two route groups (already the existing shape) achieves the separation without operational duplication.
-- **Choosing account type before or immediately at signup** — rejected; both add friction or force a premature/adversarial framing for a person who may turn out to be both participant and organizer.
-- **Persisting "current workspace" server-side as an authorization signal** — rejected; workspace must remain a client-side UX convenience only, never trusted by RLS (this is the single most important guardrail this phase establishes for future implementers).
-
-## 5. Risks and open questions
-
-- **Organizer-as-participant / organizer-as-judge conflict of interest** (`docs/architecture/RLS_STRATEGY.md` §6) — genuinely open, requires a human product-policy decision before `PHASE-AUTH-001` or any later phase implements judge-assignment enforcement. A recommendation is given (allow self-registration with a visible "organizer of this event" flag; disallow self-judging by default) but is explicitly not treated as decided.
-- **`organization_invites` is new schema, not previously anywhere in `docs/DATABASE.md`** — a genuine gap found during this phase, not a redesign of anything that worked before. Flagged clearly so it isn't mistaken for scope creep when `PHASE-AUTH-001` eventually builds it.
-- **Notifications** is a foreseeable near-future table group with zero design yet — deliberately deferred, not designed here, to avoid inventing it ad hoc without its own ADR later.
-- **Exact UX treatment** of the workspace/org switchers (dropdown vs. pill vs. modal, copy, placement) is explicitly left to a future Design Authority pass — this phase specifies visibility rules and behavior only, not visuals.
-
-## 6. Documentation touched
-
-- `docs/PHASES.md` — no change required this phase; the "Next planned phase — Role-Aware Authentication and Dashboard Architecture" entry already added in the prior consolidation pass correctly anticipated this work and needs no edit. Verified by re-reading it before starting this phase.
-- All seven new `docs/architecture/*.md` files are new; nothing in `docs/DATABASE.md`, `docs/RLS_ACCESS_MATRIX.md`, `docs/PRODUCT_DECISIONS.md`, `docs/PRIVACY_MODEL.md`, `docs/ROUTES.md`, or `docs/ARCHITECTURE.md` was edited — every decision in this phase either ratifies what those documents already say (called out explicitly, decision by decision, in `DECISIONS.md`) or adds something genuinely new without contradicting them. This was verified by reading all six of those documents in full before writing anything.
-
-## 7. Recommended implementation order
-
-1. **`PHASE-AUTH-001`** (staged at `tasks/PHASE-AUTH-001.md`, not active) — schema foundation (`default_workspace`, `organization_invites`, optionally `last_active_organization_id`) + onboarding flow + routing/redirect middleware. No dashboard UI.
-2. **A follow-up phase** (not yet drafted) — Participant Dashboard content, built against the now-real `default_workspace`/routing foundation.
-3. **A follow-up phase** (not yet drafted) — Organizer Dashboard content, including the org switcher UI and the command-center surface already specified in `docs/ROUTES.md`/`docs/ARCHITECTURE.md`.
-4. **Only after both dashboards exist and are stable:** the `event_roles` enum extension (`staff`, `volunteer`) and the organizer-conflict-of-interest policy decision from `RLS_STRATEGY.md` §6 — neither blocks 1–3, so both should wait rather than add scope to the foundation task.
-
-## 8. What Codex will implement first, and what should wait
-
-**First (once approved):** `PHASE-AUTH-001` exactly as scoped in `tasks/PHASE-AUTH-001.md` — schema + onboarding + routing, nothing more. Both required approvals (migration, RLS) are explicitly marked **not yet given** in that file; a human must approve them before Codex starts.
-
-**Should wait:**
-- Any dashboard UI (needs its own task and, likely, Design Authority involvement for the switcher components).
-- The `event_roles` enum extension (`staff`, `volunteer`) — no consumer for it yet.
-- Any enforcement of the organizer-conflict-of-interest question — needs a human product decision first, not just a technical implementation.
-- `hackathons.visibility` / `hackathon_invites` / `organizations.category` — all explicitly future-scalability items, no current product need.
-- A Notifications table group — undesigned, would be invented ad hoc if built now.
+This document replaces all prior `CLAUDE_IMPLEMENTATION_SUMMARY.md` content. It records the resolution of the two architecture gaps that blocked `AUTH-002A` from being written (see the `DECISION_REQUIRED` response in the immediately preceding turn), the three binding human decisions that resolved them, the documentation updates that record those decisions, and the one real UI route this task builds.
 
 ---
 
-No backend, database, migration, RLS, auth, frontend, or package file was created, modified, or deleted this phase, other than the eight new documentation/task files listed in §2. Nothing was committed or pushed.
+## 1. What this task covered
+
+`AUTH-002A` (Authentication Session, Callback, and Onboarding Actions) could not be written as a task because two of its seven architecture-gate questions had no answer in the approved docs: how a first-time user is distinguished from a returning one, and whether the approved organizer landing destination (`/organizer`) actually exists. The human resolved both with three binding decisions; this task (`AUTH-002-PRE`) records those decisions in the source-of-truth architecture documents and builds the one piece of real UI (`/organizer`) that `AUTH-002A` needs to exist before it can redirect anyone to it.
+
+## 2. Decisions recorded
+
+1. **Persisted first-run onboarding signal:** `profiles.initial_onboarding_completed_at timestamptz null`. `null` = has not completed the first-run workspace-choice step; a timestamp = has. **Not implemented by this task** — the column does not exist yet; it is approved for `AUTH-002A` to add, under a migration that task will need separate approval to run. It is workflow/preference state only: never authorization, never read by RLS or a `security definer` function, never a substitute for `organization_members` as the source of organizer authority. It is explicitly **not** participant profile completeness — university, major, links, skills, experience, availability, matching preferences, and consent remain a separate, later concern (`PROFILE-001`/`PROFILE-002`). A participant can complete initial onboarding and still be correctly blocked later from matching/registration until that separate profile-completeness bar is met.
+2. **`/organizer` is the canonical, real organizer destination — built now, not deferred and not faked.** The architecture already named `/organizer` as the organizer landing route, but `docs/ROUTES.md` recorded it as not yet built. The human explicitly rejected the alternative (redirecting a freshly-bootstrapped organizer to `/dashboard` as a temporary fallback) because it would blur the two-separate-products framing at exactly the moment it matters most. This task builds the real route instead: `src/app/organizer/page.tsx`, an honest, minimal, production-quality workspace shell — no mock data, no dead links.
+3. **Email verification policy, environment-scoped:** local development may keep `enable_confirmations = false` (already true of this repo's `supabase/config.toml` — confirmed by direct inspection, not assumed) for practical automated testing. Production requires email verification before a user may complete initial onboarding. This is a policy statement for a future hosted-configuration pass — no hosted Supabase setting was touched, no remote command was run, no production key was introduced by this task.
+
+## 3. Documents changed, and exactly what changed in each
+
+- **`docs/architecture/AUTH_ARCHITECTURE.md`** — §2 updated to list both identity fields (`default_workspace`, implemented; `initial_onboarding_completed_at`, approved/planned) with their implementation status stated explicitly. New §4a added: the full, three-times-stated semantics of `initial_onboarding_completed_at` (what it is, what it explicitly is not — twice: not profile completeness, not authorization — and why a persisted column was chosen over a heuristic). §4 step 3 (verification) updated with the environment-scoped policy from Decision 3. §4 step 4 updated to state the onboarding gate is now driven by `initial_onboarding_completed_at is null`, not an inferred signal. §5's routing table rewritten as a "case" table with an explicit first-run row before the deterministic default-workspace/membership rows, and the organizer-with-membership row now points at the real `/organizer` route instead of an unresolved "org home or event" note; a closing line records that the `/dashboard`-fallback alternative was explicitly rejected.
+- **`docs/architecture/DECISIONS.md`** — new `AD-11` entry added (before the summary table), recording all three decisions in the same alternatives-considered/decision/consequences format as AD-1 through AD-10, with the human-approval date and the exact rejected alternatives for each (generic boolean vs. timestamp; heuristic-based vs. persisted first-run detection; `/dashboard` fallback vs. building the real route).
+- **`docs/architecture/PRODUCT_FLOWS.md`** — the routing/redirect table (§4) gained the first-run-check row (evaluated before any other row, before any `next` value is honored) and the organizer-with-membership row now names `/organizer` as real, plus a note that the zero-membership organizer case never falls back to `/dashboard`.
+- **`docs/architecture/DASHBOARD_ARCHITECTURE.md`** — §3's "Org home (`/organizer`)" bullet updated to state the route now has a real, minimal implementation (this task), explicitly framed as a first increment for later phases to build on, not a throwaway placeholder.
+- **`docs/ROUTES.md`** — the `/organizer` row changed from "Planned... No page exists yet" to "**Built**" with an honest description of its current minimal scope. The `/auth` row gained the environment-scoped email-verification policy note from Decision 3, clearly marked as not implemented by this phase.
+
+No other document was touched. `docs/DATABASE.md` and `docs/RLS_ACCESS_MATRIX.md` were deliberately **not** edited — `initial_onboarding_completed_at` is not yet implemented, so documenting it there now would misstate the current schema; that update belongs to `AUTH-002A`, when the column actually exists.
+
+## 4. Exact organizer route created
+
+**File:** `src/app/organizer/page.tsx` (new).
+
+**Structure:** a server component (no `"use client"`, no motion — consistent with the existing `(participant)/dashboard` and `organizer/events/[eventId]` pages, both plain server components; this page follows the same "quiet, tool-register" visual register `docs/DESIGN_SYSTEM.md` specifies for authenticated tool pages, deliberately distinct from the public `/organizers` marketing page's motion-heavy register). Self-contained — includes its own `<SiteHeader />` + `<AppShell>` wrapper inline, because no `src/app/organizer/layout.tsx` exists (and none was added — see §6 for why) and the root layout provides no shell chrome.
+
+**Content:**
+- `SectionHeader` — eyebrow "Organizer," title "Your organizer workspace," a one-line description of what this space is for.
+- `EmptyState` (existing primitive, reused, not redesigned) — "Workspace ready — no hackathons yet," honest description that event creation and command-center management are coming in later organizer phases, with one real, working CTA: "Browse live hackathons" → `/events` (an existing, live public route — not a dead link).
+- A `Card` — "What's coming next" — three plain-language lines describing future capability (create/publish a hackathon, invite co-organizers, track the event lifecycle) as prose, not as buttons to routes that don't exist yet.
+
+**What it deliberately does not contain:** no mock event metrics, no fake organization name/data (no data fetching is attempted at all — there is no organization-reading helper in scope for this task, and inventing one would have been schema/helper work outside this task's boundaries), no organization-creation form, no auth/onboarding form, no workspace switcher (that's `PRODUCT_FLOWS.md` §2/§3 territory, explicitly deferred to whichever phase builds the full authenticated nav), no duplication of the public `/organizers` marketing page's pitch content or motion.
+
+**Verified by build:** `npm run build` (re-run after every edit in this task) shows `/organizer` as a genuine static (`○`) route in the route table, alongside the existing `/organizer/events/[eventId]` dynamic route — both now present and distinct.
+
+## 5. Why no `src/app/organizer/layout.tsx` was added
+
+Considered and rejected: a shared layout at `src/app/organizer/layout.tsx` would cascade to *every* route under `/organizer/**`, including the existing `organizer/events/[eventId]/layout.tsx` subtree — which already renders its own `<SiteHeader />` + `<AppShell>`. Adding a parent layout with the same chrome would double-render the site header for the existing event page, a real visual regression this task must not introduce (the task explicitly restricts touching the existing event-specific organizer page/layout to only a "tiny, strictly required, explicitly justified" correction — a double-header bug would not qualify, and adding the shared layout to cause one would be self-inflicted). The self-contained page approach avoids this risk entirely and required zero changes to any existing file.
+
+## 6. Confirmation: no database, backend, or security implementation occurred
+
+No migration file was created. No RLS policy was touched. No file under `supabase/**` was touched. No file under `src/lib/auth/**` was touched. `src/proxy.ts` was not touched — and needed no change: its existing matcher (`/organizer/:path*`) already covers the new bare `/organizer` route, confirmed by inspection (`:path*` matches zero-or-more segments) and by the unchanged proxy behavior already verified live in the `PHASE-AUTH-001` closure review. No package file was touched, no dependency added. No database write, read, or query of any kind exists anywhere in the new page — it is fully static.
+
+## 7. Explicit next phase
+
+**`PHASE-AUTH-002A` — Authentication Session, Callback, and Onboarding Actions.** Both blocking gaps from the earlier `DECISION_REQUIRED` response are now resolved:
+- The first-run detection mechanism is decided (`initial_onboarding_completed_at`, §2 above) — `AUTH-002A` may now specify the exact migration adding it.
+- The organizer landing destination is real (`/organizer`, §4 above) — `AUTH-002A`'s organizer-onboarding action may now redirect to it without inventing a fake destination or falling back to `/dashboard`.
+
+## 8. Explicit migration approval that will apply in the next phase
+
+The human's Decision 1 in this task constitutes advance approval for `AUTH-002A` to include, in its own scoped task and subject to that task's own explicit approval-gate confirmation (per `CLAUDE.md`'s standing migration-approval rule — this task does not itself grant blanket approval for *all* of `AUTH-002A`, only for this specific column):
+
+```
+profiles.initial_onboarding_completed_at timestamptz null
+```
+
+No other schema change is pre-approved by this task.
+
+## 9. Explicit separation between initial onboarding and participant profile completion
+
+Stated once here for the record, matching §4a of `AUTH_ARCHITECTURE.md`: **initial onboarding** (this task's concern) is exactly one question — has this person ever been asked participant-vs-organizer — answered by `initial_onboarding_completed_at`. **Participant profile completion** (university, major, graduation year, GitHub/LinkedIn/portfolio, primary role, skills, experience level, availability, matching preferences, privacy/contact consent) is a separate, later, richer concern belonging to `PROFILE-001`/`PROFILE-002`, gated independently at the point of matching/event-registration, not at login. Completing one does not imply completing the other.
