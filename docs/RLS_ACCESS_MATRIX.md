@@ -9,11 +9,15 @@ Legend: ✅ allowed · 🔶 allowed with condition · ❌ denied · RPC = only t
 | Table | anon | participant | organizer | judge | mentor | platform_admin |
 |---|---|---|---|---|---|---|
 | profiles SELECT | ❌ | 🔶 own row full; others only via `public_profile` view (no contact data) | 🔶 registrants of own events via RPC for safe profile fields | ❌ (names via submission views only) | ❌ | ✅ |
-| profiles INSERT | ❌ | 🔶 own currently (`PHASE3C-001` scaffolding); D17 target is signup trigger, then separately approved RLS tightening | — | — | — | — |
+| profiles INSERT | ❌ | ❌ direct insert; signup trigger creates rows | — | — | — | — |
 | profiles UPDATE | ❌ | 🔶 own | ❌ | ❌ | ❌ | ✅ |
 | profiles DELETE | ❌ | 🔶 own (account deletion flow, cascades per PRIVACY_MODEL) | ❌ | ❌ | ❌ | ✅ |
-| organizations R / W | ✅ verified only / ❌ | ✅ verified / ❌ | 🔶 own org / own org (owner-admin) | ❌ | ❌ | ✅ |
-| organization_members | ❌ | 🔶 own memberships | 🔶 own org read; owner/admin manage | ❌ | ❌ | ✅ |
+| organizations SELECT | ❌ | 🔶 member orgs only via `is_organization_member(organization_id)` | 🔶 member orgs only via `is_organization_member(organization_id)` | ❌ | ❌ | ✅ future |
+| organizations INSERT | ❌ | RPC only: `create_organization_with_owner` | RPC only: `create_organization_with_owner` | ❌ | ❌ | ✅ future |
+| organizations UPDATE/DELETE | ❌ | ❌ | ❌ in current slice | ❌ | ❌ | ✅ future |
+| organization_members SELECT | ❌ | 🔶 rows for orgs where user is a member | 🔶 rows for orgs where user is a member | ❌ | ❌ | ✅ future |
+| organization_members INSERT | ❌ | ❌ direct DML; owner row created only by `create_organization_with_owner` | ❌ direct DML; invites/member management future | ❌ | ❌ | ✅ future |
+| organization_members UPDATE/DELETE | ❌ | ❌ | ❌ in current slice | ❌ | ❌ | ✅ future |
 | event_roles | ❌ | 🔶 own rows | 🔶 own events manage | 🔶 own row | 🔶 own row | ✅ |
 
 `user_contacts` is a private P3 contact-data table added in `PHASE3B-001`. `PHASE3C-001` grants authenticated users self-owned SELECT/INSERT/UPDATE only (`user_id = auth.uid()`), so D17 assigns contact-row creation to onboarding. No organizer, judge, mentor, sponsor, public, or cross-user contact access exists; future reveal or organizer contact reads still require separately approved audited RPCs.
@@ -65,8 +69,9 @@ Legend: ✅ allowed · 🔶 allowed with condition · ❌ denied · RPC = only t
 
 ## Enforcement notes
 
-1. Helper functions (`is_event_organizer`, `is_event_judge`, `is_event_mentor`, `is_platform_admin`, `is_team_member`) are `security definer`, `stable`, and search-path pinned — RLS policies stay one-line readable.
+1. Helper functions (`is_organization_member`, `is_event_organizer`, `is_event_judge`, `is_event_mentor`, `is_platform_admin`, `is_team_member`) are `security definer`, `stable`, and search-path pinned — RLS policies stay one-line readable. `is_organization_member(p_organization_id uuid)` is the recursion-safe helper for `organizations` and `organization_members` policies.
 2. Anything crossing user boundaries (reveal, check-in, proposal response, consent, report snapshot) is an RPC with explicit checks + audit write; direct DML on those tables is denied even to authenticated users.
 3. Service-role key usage is confined to `src/lib/supabase/admin.ts`; each caller function is named, reviewed, and audit-logged.
 4. Every policy gets a test note in the migration PR: "as role X, attempt Y, expect Z." Minimum manual matrix run before each phase's definition-of-done.
 5. Storage buckets: `avatars` (public read, owner write), `event-covers` (public read, org write), `submissions` (team + organizer + assigned judge read, team write) — mirrored path-based policies.
+6. `profiles.default_workspace` is never an authorization signal. It may influence default post-auth navigation only and must not appear in RLS policy predicates or security-definer authorization checks.

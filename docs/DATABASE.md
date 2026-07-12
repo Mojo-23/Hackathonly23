@@ -13,7 +13,8 @@ Privacy levels used below: **P0** public · **P1** authenticated/event-scoped ·
 ### profiles (P2)
 Who a user is, platform-wide. One row per auth user, created by trigger on signup per D17. The trigger seeds `full_name` from auth metadata (`full_name`, then `name`) or `New participant` when metadata is absent; onboarding must replace placeholders before registration or matching. Identity/display data only; private contact fields live in `user_contacts`.
 - `id uuid pk references auth.users(id)` — **the naming-rule exception**
-- `full_name text not null`, `university text`, `major text`, `graduation_year integer`, `governorate text`, `city text`, `bio text`, `github_url text`, `linkedin_url text`, `portfolio_url text`, `experience_level text` (`beginner|intermediate|advanced`), `primary_role text` (`frontend|backend|fullstack|mobile|ai_ml|data|design|product|business|cyber|hardware`), `looking_for_team boolean default false`, `created_at`, `updated_at`
+- `full_name text not null`, `university text`, `major text`, `graduation_year integer`, `governorate text`, `city text`, `bio text`, `github_url text`, `linkedin_url text`, `portfolio_url text`, `experience_level text` (`beginner|intermediate|advanced`), `primary_role text` (`frontend|backend|fullstack|mobile|ai_ml|data|design|product|business|cyber|hardware`), `looking_for_team boolean default false`, `default_workspace text not null default 'participant'` (`participant|organizer`), `created_at`, `updated_at`
+- `default_workspace` is preference-only for routing/default landing destination. It grants no authority and is not used by RLS or security-definer authorization checks.
 - Ownership: the user. RLS: user reads/updates own row. Others **never** select this table directly — privacy-safe fields exposed via `public_profile` view / RPCs (no contact data). Organizer access to registrant contact goes through application-scoped RPC, audited.
 - Indexes: `(university)`.
 
@@ -28,12 +29,14 @@ Note: `PHASE3B-001` intentionally corrected the earlier inline-contact `profiles
 
 ### organizations (P1)
 Organizer entities (university club, company, NGO).
-- `id`, `name`, `slug unique`, `logo_url`, `description`, `website`, `is_verified bool default false` (platform admin sets), `created_by uuid → profiles(id)` *(column name `created_by_user_id`)*
-- RLS: public read of verified orgs; members update; platform_admin all.
+- Built now: `id uuid pk default gen_random_uuid()`, `name text not null`, `slug text not null unique`, `created_by_user_id uuid not null references profiles(id)`, `created_at`, `updated_at`.
+- Not yet built: `logo_url`, `description`, `website`, `is_verified bool default false`, billing, branding, settings, or sponsor fields. The fuller future shape remains planned; this foundation slice intentionally omits it.
+- RLS now: members can read their own organization rows only. No public/anonymous organization read exists yet because `is_verified` is not built. Organization creation is only through `create_organization_with_owner`; no direct insert/update/delete policy exists in this slice.
 
 ### organization_members (P1)
-- `id`, `organization_id fk`, `user_id fk → profiles(id)`, `role` enum (`owner|admin|staff`), unique `(organization_id, user_id)`
-- RLS: members read own org's members; owner/admin manage.
+- Built now: `id uuid pk default gen_random_uuid()`, `organization_id uuid not null references organizations(id) on delete cascade`, `user_id uuid not null references profiles(id) on delete cascade`, `role text not null` (`owner|admin|staff`), `created_at`, `updated_at`, unique `(organization_id, user_id)`.
+- Not yet built: any `status` column or invite/pending lifecycle. `organization_invites` remains future work.
+- RLS now: members can read membership rows for organizations where they are members, including fellow members' roles. No direct insert/update/delete policy exists; membership creation in this slice is only through `create_organization_with_owner`.
 
 ### platform_admins (P3)
 - `user_id pk fk`. Read by security-definer helper `is_platform_admin()` only. No UI in V1.
